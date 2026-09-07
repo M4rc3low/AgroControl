@@ -81,16 +81,24 @@
 - [x] migration `MachineryMarketCore`;
 - [x] testes unitários e integração PostgreSQL.
 
-## Sprint 6 — AgroControl Intelligence ⏭️
+## Sprint 6 — AgroControl Intelligence ✅
 
-- [ ] FastAPI;
-- [ ] contrato API↔Intelligence;
-- [ ] análise exploratória;
-- [ ] previsão inicial de produtividade;
-- [ ] processamento assíncrono quando necessário;
-- [ ] visão computacional em fase posterior.
+- [x] serviço Python com FastAPI;
+- [x] contrato HTTP versionado `v1` entre C# e Python;
+- [x] health check e informações do modelo;
+- [x] pipeline determinístico de preparação e inferência;
+- [x] baseline por produtividade esperada e média histórica;
+- [x] regressão Ridge comparada ao baseline com MAE/RMSE;
+- [x] comportamento explícito para dados insuficientes;
+- [x] cliente HTTP tipado no backend C#;
+- [x] isolamento multi-tenant antes da chamada ao Python;
+- [x] timeout e indisponibilidade tratados separadamente;
+- [x] Dockerfile e Docker Compose;
+- [x] CI Python com Ruff e pytest;
+- [x] testes C# e integração PostgreSQL;
+- [x] documentação de arquitetura, contrato e limites do modelo.
 
-## Sprint 7 — AgroControl Telemetry
+## Sprint 7 — AgroControl Telemetry ⏭️
 
 - [ ] Spring Boot;
 - [ ] modelo de eventos;
