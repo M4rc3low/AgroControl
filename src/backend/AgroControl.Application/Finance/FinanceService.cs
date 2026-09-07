@@ -214,10 +214,10 @@ public sealed class FinanceService(
 
         var totals = await repository.GetTotalsAsync(organizationId, null, null, null, null, seasonId, cancellationToken);
         var result = totals.AccruedRevenue - totals.AccruedExpense;
-        var margin = totals.AccruedRevenue > 0 ? result / totals.AccruedRevenue * 100m : null;
-        var productionUnits = season.ActualYieldPerHectare is > 0 ? season.ActualYieldPerHectare.Value * field.AreaHectares : null;
+        decimal? margin = totals.AccruedRevenue > 0 ? result / totals.AccruedRevenue * 100m : null;
+        decimal? productionUnits = season.ActualYieldPerHectare is > 0 ? season.ActualYieldPerHectare.Value * field.AreaHectares : null;
         var costPerHectare = field.AreaHectares > 0 ? totals.AccruedExpense / field.AreaHectares : 0m;
-        var costPerUnit = productionUnits is > 0 ? totals.AccruedExpense / productionUnits.Value : null;
+        decimal? costPerUnit = productionUnits is > 0 ? totals.AccruedExpense / productionUnits.Value : null;
 
         var dto = new SeasonFinancialSummaryDto(
             season.Id, field.Id, field.FarmId, field.AreaHectares, season.ActualYieldPerHectare, productionUnits,
@@ -275,7 +275,7 @@ public sealed class FinanceService(
     private static FinancialSummaryDto ToSummary(FinanceTotals totals)
     {
         var accruedResult = totals.AccruedRevenue - totals.AccruedExpense;
-        var margin = totals.AccruedRevenue > 0 ? accruedResult / totals.AccruedRevenue * 100m : null;
+        decimal? margin = totals.AccruedRevenue > 0 ? accruedResult / totals.AccruedRevenue * 100m : null;
         return new FinancialSummaryDto(
             totals.AccruedRevenue, totals.AccruedExpense, accruedResult, margin,
             totals.CashRevenue, totals.CashExpense, totals.CashRevenue - totals.CashExpense,
