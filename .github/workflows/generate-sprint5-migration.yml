@@ -47,4 +47,5 @@ jobs:
           git add src/backend/AgroControl.Infrastructure/Persistence/Migrations
           git diff --cached --quiet && exit 0
           git commit -m "db: add MachineryMarketCore migration"
-          git push
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin HEAD:"$GITHUB_REF_NAME"
