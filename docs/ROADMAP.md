@@ -35,27 +35,39 @@ Objetivo: deixar o projeto pronto para evolução controlada.
 - [x] auditoria temporal básica (`CreatedAtUtc` / `UpdatedAtUtc`);
 - [x] testes unitários e CI com `dotnet test`.
 
-## Sprint 2 — Produção Rural ⏭️
+## Sprint 2 — Produção Rural ✅
 
-- [ ] Farm;
-- [ ] Field;
-- [ ] Crop;
-- [ ] Season;
-- [ ] operações CRUD;
-- [ ] validações;
-- [ ] filtros e paginação;
-- [ ] primeiros testes de integração.
+- [x] Farm;
+- [x] Field;
+- [x] Crop;
+- [x] Season;
+- [x] status de safra;
+- [x] operações CRUD;
+- [x] soft delete;
+- [x] validações de área e datas;
+- [x] validação da área acumulada dos talhões;
+- [x] isolamento multi-tenant por `OrganizationId`;
+- [x] filtro reutilizável de acesso por módulo;
+- [x] filtros, busca e paginação;
+- [x] migration `ProductionCore`;
+- [x] testes unitários;
+- [x] teste de integração com PostgreSQL real no CI.
 
-## Sprint 3 — Estoque
+## Sprint 3 — Estoque ⏭️
 
-- [ ] Item;
-- [ ] categoria;
-- [ ] unidade de medida;
+- [ ] Item de estoque;
+- [ ] categorias de insumo;
+- [ ] unidades de medida;
+- [ ] depósitos/localizações;
 - [ ] entrada;
 - [ ] saída;
 - [ ] ajuste;
-- [ ] saldo por propriedade;
-- [ ] alertas de estoque baixo.
+- [ ] lote e validade quando aplicável;
+- [ ] vínculo de consumo com propriedade/talhão/safra;
+- [ ] saldo por propriedade e depósito;
+- [ ] histórico de movimentações;
+- [ ] alertas de estoque baixo;
+- [ ] testes e migration.
 
 ## Sprint 4 — Financeiro
 

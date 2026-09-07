@@ -2,7 +2,7 @@
 
 **AgroControl** é uma plataforma modular para gestão e inteligência no agronegócio. O projeto começa como um **monólito modular em C# / ASP.NET Core**, mantendo pontos claros de integração com serviços especializados em **Python** (dados, IA e visão computacional) e **Java** (telemetria e IoT).
 
-> Status atual: **Sprint 1 concluída — Identity, Organizations e acesso por módulos**
+> Status atual: **Sprint 2 concluída — núcleo de Produção Rural**
 
 ## Objetivo
 
@@ -53,21 +53,41 @@ A API principal começa como um **monólito modular**. Python e Java só entram 
 
 ## O que já funciona
 
+### Plataforma e segurança
+
 - solução .NET 10 organizada em Domain, Application, Infrastructure e API;
 - PostgreSQL com Entity Framework Core;
-- migration inicial e factory de design-time;
+- migrations e factory de design-time;
 - Organization, User e membership usuário-organização;
 - papéis `Owner`, `Admin`, `Manager` e `Viewer`;
 - cadastro e login com JWT;
 - senha protegida com PBKDF2-HMAC-SHA512 e salt aleatório;
 - planos `Basic`, `Pro`, `Intelligence` e `Enterprise`;
 - entitlements e overrides por organização;
+- filtro reutilizável de acesso aos módulos;
 - retorno `403 Forbidden` para módulo não habilitado;
-- Docker Compose com aplicação automática das migrations;
-- testes unitários;
-- CI com restore, build e test.
+- Docker Compose com aplicação automática das migrations.
 
-## Módulos
+### Produção Rural
+
+- propriedades (`Farm`);
+- talhões (`Field`);
+- culturas e variedades (`Crop`);
+- safras (`Season`);
+- status `Planned`, `Active`, `Harvested` e `Cancelled`;
+- CRUD completo com soft delete;
+- paginação, busca e filtros;
+- isolamento de dados por `OrganizationId`;
+- validação para que a soma dos talhões ativos não ultrapasse a área da propriedade;
+- produtividade esperada e realizada por hectare.
+
+### Qualidade
+
+- testes unitários de domínio e infraestrutura de segurança;
+- teste de integração com PostgreSQL real;
+- CI provisionando PostgreSQL 17 e executando restore, build e test.
+
+## Módulos e planos
 
 ### Basic
 
@@ -85,7 +105,7 @@ Tudo do Pro + Intelligence e Telemetry.
 
 Todos os módulos, incluindo Export.
 
-Veja [`docs/MODULES.md`](docs/MODULES.md) e [`docs/SPRINT_1_IDENTITY.md`](docs/SPRINT_1_IDENTITY.md).
+Veja [`docs/MODULES.md`](docs/MODULES.md), [`docs/SPRINT_1_IDENTITY.md`](docs/SPRINT_1_IDENTITY.md) e [`docs/SPRINT_2_PRODUCTION.md`](docs/SPRINT_2_PRODUCTION.md).
 
 ## Executando com Docker
 
@@ -99,7 +119,9 @@ docker compose up --build
 
 A API ficará em `http://localhost:8080`.
 
-### Endpoints iniciais
+## Endpoints atuais
+
+### Plataforma e autenticação
 
 ```text
 GET  /health
@@ -112,7 +134,20 @@ GET  /api/v1/platform/entitlements
 GET  /api/v1/platform/modules/{moduleKey}/access
 ```
 
-Exemplo de cadastro:
+### Produção rural
+
+Cada recurso possui `GET`, `GET /{id}`, `POST`, `PUT /{id}` e `DELETE /{id}`:
+
+```text
+/api/v1/farms
+/api/v1/fields
+/api/v1/crops
+/api/v1/seasons
+```
+
+As listagens aceitam paginação e busca. Talhões podem ser filtrados por `farmId`; safras por `fieldId` e `status`.
+
+Exemplo de cadastro inicial:
 
 ```json
 {
@@ -125,11 +160,21 @@ Exemplo de cadastro:
 
 O cadastro cria automaticamente a organização, o primeiro usuário como `Owner` e uma assinatura `Basic` ativa.
 
+Exemplo de propriedade:
+
+```json
+{
+  "name": "Fazenda Santa Clara",
+  "totalAreaHectares": 485.5,
+  "city": "Rio Verde",
+  "state": "GO"
+}
+```
+
 ## Migrations
 
-A migration inicial é `20260907002000_InitialIdentity`.
-
-Para usar o EF CLI localmente, configure opcionalmente `AGROCONTROL_CONNECTION_STRING` e execute o comando apontando para o projeto de Infrastructure. O `AgroControlDbContextFactory` permite criar o contexto em design-time sem depender da inicialização da API.
+- `20260907002000_InitialIdentity`
+- `20260907010000_ProductionCore`
 
 No Docker Compose, as migrations são aplicadas automaticamente porque `Database__ApplyMigrations=true`.
 
@@ -141,8 +186,8 @@ A chave de `appsettings.Development.json` é apenas uma chave conhecida de desen
 
 1. ✅ **Sprint 0** — fundação, documentação, arquitetura, CI e containers.
 2. ✅ **Sprint 1** — identidade, organizações, PostgreSQL e autorização por módulo.
-3. ⏭️ **Sprint 2** — propriedades, talhões, culturas e safras.
-4. **Sprint 3** — estoque.
+3. ✅ **Sprint 2** — propriedades, talhões, culturas e safras.
+4. ⏭️ **Sprint 3** — estoque e movimentações de insumos.
 5. **Sprint 4** — financeiro.
 6. **Sprint 5** — máquinas e mercado.
 7. **Sprint 6** — serviço Python de inteligência.

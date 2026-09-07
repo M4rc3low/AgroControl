@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using System.Text;
 using AgroControl.Api.Auth;
+using AgroControl.Api.Endpoints;
 using AgroControl.Application.Identity;
 using AgroControl.Application.Platform;
+using AgroControl.Application.Production;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Domain.Platform;
 using AgroControl.Infrastructure;
@@ -17,6 +19,10 @@ builder.Services.AddSingleton<IModuleCatalog, ModuleCatalog>();
 builder.Services.AddSingleton<PlanEntitlementCatalog>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ModuleAccessService>();
+builder.Services.AddScoped<FarmService>();
+builder.Services.AddScoped<FieldService>();
+builder.Services.AddScoped<CropService>();
+builder.Services.AddScoped<SeasonService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var jwtOptions = new JwtOptions
@@ -66,7 +72,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     service = "AgroControl.Api",
     status = "running",
-    version = "0.2.0"
+    version = "0.3.0"
 }));
 
 app.MapHealthChecks("/health");
@@ -175,6 +181,8 @@ authorized.MapGet("/platform/modules/{moduleKey}/access", async (
             title: "Module not enabled",
             detail: $"The {module} module is not enabled for this organization.");
 });
+
+app.MapProductionEndpoints();
 
 app.Run();
 

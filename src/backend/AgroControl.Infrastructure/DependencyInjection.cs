@@ -1,5 +1,6 @@
 using AgroControl.Application.Common;
 using AgroControl.Application.Identity;
+using AgroControl.Application.Production;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Infrastructure.Persistence;
 using AgroControl.Infrastructure.Security;
@@ -19,6 +20,7 @@ public static class DependencyInjection
         services.AddDbContext<AgroControlDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<IProductionRepository, ProductionRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 
