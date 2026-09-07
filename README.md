@@ -2,7 +2,7 @@
 
 **AgroControl** é uma plataforma modular para gestão e inteligência no agronegócio. O projeto começa como um **monólito modular em C# / ASP.NET Core**, mantendo pontos claros de integração com serviços especializados em **Python** (dados, IA e visão computacional) e **Java** (telemetria e IoT).
 
-> Status atual: **Sprint 4 concluída — financeiro, fluxo de caixa e rentabilidade por safra**
+> Status atual: **Sprint 5 concluída — máquinas, manutenção e mercado de commodities**
 
 ## Objetivo
 
@@ -12,7 +12,7 @@ Centralizar, em uma única plataforma, os principais fluxos de uma operação ru
 - culturas e safras;
 - estoque de insumos;
 - custos, receitas e resultado financeiro;
-- máquinas e manutenção;
+- máquinas, horímetro, abastecimentos e manutenção;
 - mercado e commodities;
 - agricultura de precisão;
 - análise de dados e IA;
@@ -95,6 +95,30 @@ A API principal começa como um **monólito modular**. Python e Java só entram 
 - resumo econômico por safra com custo por hectare, custo por unidade produzida e ponto de equilíbrio;
 - isolamento multi-tenant e proteção pelo módulo `Finance`.
 
+### Máquinas e manutenção
+
+- máquinas e implementos com código interno, tipo, fabricante, modelo, ano e propriedade opcional;
+- status `Active`, `Maintenance` e `Inactive`;
+- histórico de horímetro com bloqueio de regressão;
+- abastecimentos com litros, custo total e custo unitário;
+- manutenção preventiva e corretiva;
+- custos de peças, mão de obra e outros custos;
+- próxima manutenção por data e/ou horímetro;
+- resumo de combustível, manutenção, horas rastreadas e custo por hora rastreada;
+- isolamento multi-tenant e proteção pelo módulo `Machinery`.
+
+### Mercado e commodities
+
+- commodities configuráveis por organização;
+- símbolo, moeda e unidade padrão;
+- histórico append-only de cotações;
+- fonte e data/hora preservadas em cada preço;
+- última cotação e comparação com a cotação anterior;
+- variação absoluta e percentual;
+- alertas `AboveOrEqual` e `BelowOrEqual` por preço-alvo;
+- contrato `IMarketQuoteProvider` para integrações externas futuras sem acoplar o domínio a um provedor;
+- isolamento multi-tenant e proteção pelo módulo `Market`.
+
 ### Qualidade
 
 - testes unitários de domínio e segurança;
@@ -119,7 +143,7 @@ Tudo do Pro + Intelligence e Telemetry.
 
 Todos os módulos, incluindo Export.
 
-Documentação detalhada em [`docs/`](docs/), incluindo [`SPRINT_3_INVENTORY.md`](docs/SPRINT_3_INVENTORY.md) e [`SPRINT_4_FINANCE.md`](docs/SPRINT_4_FINANCE.md).
+Documentação detalhada em [`docs/`](docs/), incluindo [`SPRINT_4_FINANCE.md`](docs/SPRINT_4_FINANCE.md) e [`SPRINT_5_MACHINERY_MARKET.md`](docs/SPRINT_5_MACHINERY_MARKET.md).
 
 ## Executando com Docker
 
@@ -177,7 +201,27 @@ GET  /api/v1/platform/modules/{moduleKey}/access
 /api/v1/finance/seasons/{seasonId}/summary
 ```
 
-Consulte [`docs/SPRINT_4_FINANCE.md`](docs/SPRINT_4_FINANCE.md) para contratos, regras e indicadores.
+### Máquinas
+
+```text
+/api/v1/machinery/machines
+/api/v1/machinery/machines/{id}/hour-meter
+/api/v1/machinery/machines/{id}/fuelings
+/api/v1/machinery/machines/{id}/maintenance
+/api/v1/machinery/machines/{id}/cost-summary
+```
+
+### Mercado
+
+```text
+/api/v1/market/commodities
+/api/v1/market/commodities/{id}/quotes
+/api/v1/market/commodities/{id}/summary
+/api/v1/market/commodities/{id}/alerts
+/api/v1/market/alerts
+```
+
+Consulte [`docs/SPRINT_5_MACHINERY_MARKET.md`](docs/SPRINT_5_MACHINERY_MARKET.md) para contratos, regras e decisões da Sprint 5.
 
 ## Migrations
 
@@ -185,6 +229,7 @@ Consulte [`docs/SPRINT_4_FINANCE.md`](docs/SPRINT_4_FINANCE.md) para contratos, 
 - `20260907010000_ProductionCore`
 - `20260907134514_InventoryCore`
 - `20260907191652_FinanceCore`
+- `20260907195304_MachineryMarketCore`
 
 No Docker Compose, as migrations são aplicadas automaticamente porque `Database__ApplyMigrations=true`.
 
@@ -199,8 +244,8 @@ A chave de `appsettings.Development.json` é apenas uma chave conhecida de desen
 3. ✅ **Sprint 2** — propriedades, talhões, culturas e safras.
 4. ✅ **Sprint 3** — estoque e movimentações de insumos.
 5. ✅ **Sprint 4** — financeiro e rentabilidade por safra.
-6. ⏭️ **Sprint 5** — máquinas e mercado.
-7. **Sprint 6** — serviço Python de inteligência.
+6. ✅ **Sprint 5** — máquinas, manutenção e mercado.
+7. ⏭️ **Sprint 6** — serviço Python de inteligência.
 8. **Sprint 7** — serviço Java de telemetria.
 9. **Sprint 8** — observabilidade, CI/CD avançado e Kubernetes.
 
