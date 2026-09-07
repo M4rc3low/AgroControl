@@ -37,7 +37,7 @@ jobs:
           OTEL_ENABLED=true docker compose --profile observability config >/tmp/compose-observability.yml
 
       - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
         with:
           version: latest
 
