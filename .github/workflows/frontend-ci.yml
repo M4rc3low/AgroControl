@@ -10,6 +10,9 @@ on:
       - "src/frontend/**"
       - ".github/workflows/frontend-ci.yml"
 
+permissions:
+  contents: write
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -30,13 +33,25 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Upload generated dependency lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-package-lock
-          path: src/frontend/package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit generated dependency lock
+        if: github.event_name == 'pull_request' && github.head_ref != ''
+        working-directory: .
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          cp src/frontend/package-lock.json /tmp/agrocontrol-package-lock.json
+          git fetch origin "$HEAD_REF"
+          git checkout -B "$HEAD_REF" "origin/$HEAD_REF"
+          cp /tmp/agrocontrol-package-lock.json src/frontend/package-lock.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/frontend/package-lock.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(web): lock npm dependencies"
+          git push origin HEAD:"$HEAD_REF"
 
       - name: Typecheck
         run: npm run typecheck
