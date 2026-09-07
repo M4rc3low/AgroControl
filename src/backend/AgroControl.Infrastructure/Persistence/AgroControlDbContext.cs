@@ -4,6 +4,8 @@ using AgroControl.Domain.Modules.Fields;
 using AgroControl.Domain.Modules.Finance;
 using AgroControl.Domain.Modules.Identity;
 using AgroControl.Domain.Modules.Inventory;
+using AgroControl.Domain.Modules.Machinery;
+using AgroControl.Domain.Modules.Market;
 using AgroControl.Domain.Modules.Organizations;
 using AgroControl.Domain.Modules.Seasons;
 using AgroControl.Domain.Modules.Subscriptions;
@@ -29,6 +31,13 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
     public DbSet<FinancialCategory> FinancialCategories => Set<FinancialCategory>();
     public DbSet<CostCenter> CostCenters => Set<CostCenter>();
     public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
+    public DbSet<Machine> Machines => Set<Machine>();
+    public DbSet<HourMeterReading> HourMeterReadings => Set<HourMeterReading>();
+    public DbSet<Fueling> Fuelings => Set<Fueling>();
+    public DbSet<MaintenanceRecord> MaintenanceRecords => Set<MaintenanceRecord>();
+    public DbSet<Commodity> Commodities => Set<Commodity>();
+    public DbSet<MarketQuote> MarketQuotes => Set<MarketQuote>();
+    public DbSet<PriceAlert> PriceAlerts => Set<PriceAlert>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -137,6 +146,97 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
             entity.HasIndex(x => x.SeasonId);
             entity.HasIndex(x => new { x.OrganizationId, x.Type, x.Status, x.CompetenceDate });
             entity.HasIndex(x => new { x.OrganizationId, x.DueDate });
+        });
+        modelBuilder.Entity<Machine>(entity =>
+        {
+            entity.ToTable("machines"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.InternalCode).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Manufacturer).HasMaxLength(120);
+            entity.Property(x => x.Model).HasMaxLength(120);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.CurrentHourMeter).HasPrecision(18, 2).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => x.FarmId);
+            entity.HasIndex(x => new { x.OrganizationId, x.InternalCode }).IsUnique();
+            entity.HasIndex(x => new { x.OrganizationId, x.Status });
+        });
+        modelBuilder.Entity<HourMeterReading>(entity =>
+        {
+            entity.ToTable("machine_hour_meter_readings"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Hours).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Machine>().WithMany().HasForeignKey(x => x.MachineId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.MachineId, x.OccurredAtUtc });
+        });
+        modelBuilder.Entity<Fueling>(entity =>
+        {
+            entity.ToTable("machine_fuelings"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Liters).HasPrecision(18, 3).IsRequired();
+            entity.Property(x => x.TotalCost).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.HourMeter).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Ignore(x => x.UnitCost);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Machine>().WithMany().HasForeignKey(x => x.MachineId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.MachineId, x.OccurredAtUtc });
+        });
+        modelBuilder.Entity<MaintenanceRecord>(entity =>
+        {
+            entity.ToTable("machine_maintenance_records"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.HourMeter).HasPrecision(18, 2);
+            entity.Property(x => x.PartsCost).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.LaborCost).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.OtherCost).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.NextMaintenanceHourMeter).HasPrecision(18, 2);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Ignore(x => x.TotalCost);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Machine>().WithMany().HasForeignKey(x => x.MachineId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.MachineId, x.PerformedOn });
+            entity.HasIndex(x => x.NextMaintenanceDate);
+        });
+        modelBuilder.Entity<Commodity>(entity =>
+        {
+            entity.ToTable("commodities"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Symbol).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.DefaultCurrency).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.DefaultUnit).HasMaxLength(40).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Symbol }).IsUnique();
+        });
+        modelBuilder.Entity<MarketQuote>(entity =>
+        {
+            entity.ToTable("market_quotes"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Price).HasPrecision(18, 4).IsRequired();
+            entity.Property(x => x.Currency).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.Unit).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.Source).HasMaxLength(120).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Commodity>().WithMany().HasForeignKey(x => x.CommodityId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.CommodityId, x.QuotedAtUtc });
+        });
+        modelBuilder.Entity<PriceAlert>(entity =>
+        {
+            entity.ToTable("price_alerts"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.TargetPrice).HasPrecision(18, 4).IsRequired();
+            entity.Property(x => x.Direction).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Commodity>().WithMany().HasForeignKey(x => x.CommodityId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.CommodityId, x.IsActive });
         });
     }
 }
