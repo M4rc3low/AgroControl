@@ -26,6 +26,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
+      Database__ApplyMigrations: "true"
+      Jwt__Key: ${JWT_KEY:-development-only-agrocontrol-key-change-before-production-2026}
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-agrocontrol};Username=${POSTGRES_USER:-agrocontrol};Password=${POSTGRES_PASSWORD:-agrocontrol_dev}
     ports:
       - "${API_PORT:-8080}:8080"
