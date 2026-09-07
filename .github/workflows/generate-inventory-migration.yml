@@ -31,7 +31,7 @@ jobs:
         run: >-
           dotnet ef migrations add InventoryCore
           --project src/backend/AgroControl.Infrastructure/AgroControl.Infrastructure.csproj
-          --startup-project src/backend/AgroControl.Api/AgroControl.Api.csproj
+          --startup-project src/backend/AgroControl.Infrastructure/AgroControl.Infrastructure.csproj
           --output-dir Persistence/Migrations
 
       - name: Upload generated migration
