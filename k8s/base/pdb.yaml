@@ -1,0 +1,19 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agrocontrol-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agrocontrol-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agrocontrol-intelligence
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agrocontrol-intelligence

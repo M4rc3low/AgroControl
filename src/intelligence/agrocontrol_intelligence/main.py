@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from .model import MIN_SUPERVISED_SAMPLES, MODEL_VERSION, predict_yield
+from .observability import configure_observability
 from .schemas import ModelInfoResponse, YieldPredictionRequest, YieldPredictionResponse
 
 app = FastAPI(
@@ -12,10 +13,22 @@ app = FastAPI(
     ),
 )
 
+configure_observability(app)
+
 
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"service": "AgroControl.Intelligence", "status": "healthy"}
+
+
+@app.get("/health/live")
+def liveness() -> dict[str, str]:
+    return {"service": "AgroControl.Intelligence", "status": "alive"}
+
+
+@app.get("/health/ready")
+def readiness() -> dict[str, str]:
+    return {"service": "AgroControl.Intelligence", "status": "ready"}
 
 
 @app.get("/api/v1/model", response_model=ModelInfoResponse)

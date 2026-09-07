@@ -1,0 +1,109 @@
+name: Platform CI
+
+on:
+  push:
+    paths:
+      - "docker-compose.yml"
+      - ".env.example"
+      - "infra/**"
+      - "k8s/**"
+      - "src/backend/AgroControl.Api/Dockerfile"
+      - "src/intelligence/Dockerfile"
+      - "src/telemetry/Dockerfile"
+      - ".github/workflows/platform-ci.yml"
+  pull_request:
+    paths:
+      - "docker-compose.yml"
+      - ".env.example"
+      - "infra/**"
+      - "k8s/**"
+      - "src/backend/AgroControl.Api/Dockerfile"
+      - "src/intelligence/Dockerfile"
+      - "src/telemetry/Dockerfile"
+      - ".github/workflows/platform-ci.yml"
+
+jobs:
+  integrated-platform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        run: |
+          docker compose config >/tmp/compose.yml
+          OTEL_ENABLED=true docker compose --profile observability config >/tmp/compose-observability.yml
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Validate Kubernetes manifests
+        run: |
+          kubectl kustomize k8s/base >/tmp/agrocontrol-k8s-base.yml
+          kubectl kustomize k8s/overlays/local >/tmp/agrocontrol-k8s-local.yml
+          test -s /tmp/agrocontrol-k8s-base.yml
+          test -s /tmp/agrocontrol-k8s-local.yml
+
+      - name: Build application images
+        run: docker compose build api intelligence telemetry
+
+      - name: Start integrated stack
+        env:
+          OTEL_ENABLED: "true"
+        run: docker compose --profile observability up -d
+
+      - name: Wait for application readiness
+        run: |
+          set -euo pipefail
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8090/health/ready >/dev/null \
+              && curl --fail --silent http://127.0.0.1:8100/actuator/health/readiness >/dev/null \
+              && curl --fail --silent http://127.0.0.1:8080/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose --profile observability ps
+          docker compose --profile observability logs --tail=200
+          exit 1
+
+      - name: Smoke test application contracts
+        run: |
+          curl --fail --silent http://127.0.0.1:8080/ >/tmp/api.json
+          curl --fail --silent http://127.0.0.1:8080/api/v1/platform/modules >/tmp/modules.json
+          curl --fail --silent http://127.0.0.1:8090/api/v1/model >/tmp/model.json
+          grep -q 'AgroControl.Api' /tmp/api.json
+          grep -q 'Telemetry' /tmp/modules.json
+          grep -q 'AgroControl.Intelligence' /tmp/model.json
+
+      - name: Wait for observability stack
+        run: |
+          set -euo pipefail
+          for attempt in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:9090/-/ready >/dev/null \
+              && curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null \
+              && curl --fail --silent http://127.0.0.1:3200/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose --profile observability logs prometheus grafana tempo otel-collector --tail=200
+          exit 1
+
+      - name: Verify Prometheus targets
+        run: |
+          curl --fail --silent http://127.0.0.1:9090/api/v1/targets >/tmp/targets.json
+          grep -q 'agrocontrol-telemetry' /tmp/targets.json
+          grep -q 'otel-collector' /tmp/targets.json
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose --profile observability logs --tail=300
+
+      - name: Stop stack
+        if: always()
+        run: docker compose --profile observability down -v --remove-orphans

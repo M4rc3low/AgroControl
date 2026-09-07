@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrocontrol-intelligence
+  labels:
+    app.kubernetes.io/name: agrocontrol-intelligence
+    app.kubernetes.io/part-of: agrocontrol
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agrocontrol-intelligence
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agrocontrol-intelligence
+        app.kubernetes.io/part-of: agrocontrol
+    spec:
+      containers:
+        - name: intelligence
+          image: ghcr.io/m4rc3low/agrocontrol-intelligence:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8090
+          env:
+            - name: OTEL_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: agrocontrol-config
+                  key: OTEL_ENABLED
+            - name: OTEL_SERVICE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: agrocontrol-config
+                  key: OTEL_SERVICE_NAME
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            runAsUser: 10001
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agrocontrol-intelligence
+spec:
+  selector:
+    app.kubernetes.io/name: agrocontrol-intelligence
+  ports:
+    - name: http
+      port: 8090
+      targetPort: http

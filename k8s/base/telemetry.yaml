@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agrocontrol-telemetry
+  labels:
+    app.kubernetes.io/name: agrocontrol-telemetry
+    app.kubernetes.io/part-of: agrocontrol
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agrocontrol-telemetry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agrocontrol-telemetry
+        app.kubernetes.io/part-of: agrocontrol
+    spec:
+      containers:
+        - name: telemetry
+          image: ghcr.io/m4rc3low/agrocontrol-telemetry:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8100
+          env:
+            - name: TELEMETRY_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agrocontrol-secrets
+                  key: telemetry-db-url
+            - name: TELEMETRY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: agrocontrol-secrets
+                  key: telemetry-db-user
+            - name: TELEMETRY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agrocontrol-secrets
+                  key: telemetry-db-password
+            - name: TELEMETRY_INTERNAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agrocontrol-secrets
+                  key: telemetry-internal-api-key
+            - name: TELEMETRY_MQTT_BROKER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agrocontrol-secrets
+                  key: telemetry-mqtt-broker-url
+            - name: TELEMETRY_MQTT_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: agrocontrol-config
+                  key: TELEMETRY_MQTT_ENABLED
+            - name: TELEMETRY_MQTT_QOS
+              valueFrom:
+                configMapKeyRef:
+                  name: agrocontrol-config
+                  key: TELEMETRY_MQTT_QOS
+            - name: OTEL_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: agrocontrol-config
+                  key: OTEL_ENABLED
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            runAsUser: 10001
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agrocontrol-telemetry
+spec:
+  selector:
+    app.kubernetes.io/name: agrocontrol-telemetry
+  ports:
+    - name: http
+      port: 8100
+      targetPort: http

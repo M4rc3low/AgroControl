@@ -39,6 +39,7 @@ target/
 .env.*
 !.env.example
 secrets/
+secrets.env
 
 # Logs
 *.log

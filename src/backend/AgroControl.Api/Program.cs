@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using AgroControl.Api.Auth;
 using AgroControl.Api.Endpoints;
+using AgroControl.Api.Health;
 using AgroControl.Application.Finance;
 using AgroControl.Application.Identity;
 using AgroControl.Application.Intelligence;
@@ -14,12 +15,23 @@ using AgroControl.Application.Subscriptions;
 using AgroControl.Domain.Platform;
 using AgroControl.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddJsonConsole();
+
 builder.Services.AddProblemDetails();
-builder.Services.AddHealthChecks();
+builder.Services
+    .AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: new[] { "live" })
+    .AddCheck<DatabaseHealthCheck>("database", tags: new[] { "ready" });
 builder.Services.AddSingleton<IModuleCatalog, ModuleCatalog>();
 builder.Services.AddSingleton<PlanEntitlementCatalog>();
 builder.Services.AddScoped<AuthService>();
@@ -34,6 +46,25 @@ builder.Services.AddScoped<MachineryService>();
 builder.Services.AddScoped<MarketService>();
 builder.Services.AddScoped<IntelligenceService>();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+if (builder.Configuration.GetValue<bool>("Observability:Enabled"))
+{
+    var serviceName = builder.Configuration["Observability:ServiceName"] ?? "AgroControl.Api";
+
+    builder.Services
+        .AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(serviceName))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter())
+        .WithMetrics(metrics => metrics
+            .AddMeter(
+                "Microsoft.AspNetCore.Hosting",
+                "Microsoft.AspNetCore.Server.Kestrel",
+                "System.Net.Http")
+            .AddOtlpExporter());
+}
 
 var jwtOptions = new JwtOptions
 {
@@ -65,6 +96,14 @@ if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.
 
 app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.8.0" }));
 app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live")
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready")
+});
 app.MapGet("/api/v1/platform/modules", (IModuleCatalog catalog) => Results.Ok(catalog.GetAll().Select(module => new { key = module.Key.ToString(), module.Name, status = module.Status.ToString(), module.Description })));
 app.MapPost("/api/v1/auth/register", async (RegisterCommand request, AuthService authService, CancellationToken ct) =>
 {
