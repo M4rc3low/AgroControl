@@ -1,0 +1,29 @@
+[project]
+name = "agrocontrol-intelligence"
+version = "0.1.0"
+description = "AgroControl Intelligence service for reproducible agricultural analytics and yield prediction."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.30,<1.0",
+  "numpy>=2.0,<3.0",
+  "scikit-learn>=1.6,<2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1.0",
+  "pytest>=8.3,<9.0",
+  "ruff>=0.9,<1.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

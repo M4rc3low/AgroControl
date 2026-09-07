@@ -17,6 +17,26 @@ services:
       timeout: 5s
       retries: 10
 
+  intelligence:
+    build:
+      context: .
+      dockerfile: src/intelligence/Dockerfile
+    container_name: agrocontrol-intelligence
+    restart: unless-stopped
+    ports:
+      - "${INTELLIGENCE_PORT:-8090}:8090"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -29,10 +49,14 @@ services:
       Database__ApplyMigrations: "true"
       Jwt__Key: ${JWT_KEY:-development-only-agrocontrol-key-change-before-production-2026}
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-agrocontrol};Username=${POSTGRES_USER:-agrocontrol};Password=${POSTGRES_PASSWORD:-agrocontrol_dev}
+      Intelligence__BaseUrl: http://intelligence:8090
+      Intelligence__TimeoutSeconds: ${INTELLIGENCE_TIMEOUT_SECONDS:-5}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      intelligence:
         condition: service_healthy
 
 volumes:
