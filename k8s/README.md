@@ -41,11 +41,9 @@ docker build -f src/intelligence/Dockerfile -t agrocontrol-intelligence:local .
 docker build -f src/telemetry/Dockerfile -t agrocontrol-telemetry:local .
 
 kind load docker-image agrocontrol-api:local
-a kind load docker-image agrocontrol-intelligence:local
+kind load docker-image agrocontrol-intelligence:local
 kind load docker-image agrocontrol-telemetry:local
 ```
-
-> No segundo comando acima, remova o `a ` caso tenha copiado literalmente. O comando correto é `kind load docker-image agrocontrol-intelligence:local`.
 
 Aplique então:
 
