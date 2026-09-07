@@ -57,6 +57,9 @@ services:
       TELEMETRY_INTERNAL_API_KEY: ${TELEMETRY_INTERNAL_API_KEY:-development-only-telemetry-internal-key-change-me}
       TELEMETRY_MQTT_BROKER_URL: tcp://mosquitto:1883
       TELEMETRY_MQTT_ENABLED: "true"
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      OTEL_TRACES_SAMPLER_PROBABILITY: ${OTEL_TRACES_SAMPLER_PROBABILITY:-1.0}
     ports:
       - "${TELEMETRY_PORT:-8100}:8100"
     depends_on:
@@ -65,7 +68,7 @@ services:
       mosquitto:
         condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8100/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8100/actuator/health/readiness"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -76,10 +79,14 @@ services:
       dockerfile: src/intelligence/Dockerfile
     container_name: agrocontrol-intelligence
     restart: unless-stopped
+    environment:
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      OTEL_SERVICE_NAME: AgroControl.Intelligence
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       - "${INTELLIGENCE_PORT:-8090}:8090"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=2)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health/ready', timeout=2)"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -101,6 +108,9 @@ services:
       Telemetry__BaseUrl: http://telemetry:8100
       Telemetry__TimeoutSeconds: ${TELEMETRY_TIMEOUT_SECONDS:-5}
       Telemetry__InternalApiKey: ${TELEMETRY_INTERNAL_API_KEY:-development-only-telemetry-internal-key-change-me}
+      Observability__Enabled: ${OTEL_ENABLED:-false}
+      Observability__ServiceName: AgroControl.Api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
@@ -110,7 +120,74 @@ services:
         condition: service_healthy
       telemetry:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/health/ready || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  tempo:
+    image: grafana/tempo:2.7.2
+    container_name: agrocontrol-tempo
+    command: ["-config.file=/etc/tempo.yml"]
+    profiles: ["observability"]
+    volumes:
+      - ./infra/observability/tempo/tempo.yml:/etc/tempo.yml:ro
+      - agrocontrol_tempo_data:/var/tempo
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.120.0
+    container_name: agrocontrol-otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yml"]
+    profiles: ["observability"]
+    volumes:
+      - ./infra/observability/otel-collector/config.yml:/etc/otelcol-contrib/config.yml:ro
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+      - "${OTEL_PROMETHEUS_PORT:-9464}:9464"
+    depends_on:
+      - tempo
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: agrocontrol-prometheus
+    profiles: ["observability"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - agrocontrol_prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      - otel-collector
+      - telemetry
+
+  grafana:
+    image: grafana/grafana:11.5.0
+    container_name: agrocontrol-grafana
+    profiles: ["observability"]
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-agrocontrol_dev}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - agrocontrol_grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+      - tempo
 
 volumes:
   agrocontrol_postgres_data:
   agrocontrol_telemetry_data:
+  agrocontrol_tempo_data:
+  agrocontrol_prometheus_data:
+  agrocontrol_grafana_data:
