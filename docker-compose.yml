@@ -17,6 +17,59 @@ services:
       timeout: 5s
       retries: 10
 
+  telemetry-db:
+    image: postgres:17-alpine
+    container_name: agrocontrol-telemetry-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agrocontrol_telemetry
+      POSTGRES_USER: ${TELEMETRY_DB_USER:-agrocontrol_telemetry}
+      POSTGRES_PASSWORD: ${TELEMETRY_DB_PASSWORD:-agrocontrol_telemetry_dev}
+    ports:
+      - "${TELEMETRY_DB_PORT:-5433}:5432"
+    volumes:
+      - agrocontrol_telemetry_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TELEMETRY_DB_USER:-agrocontrol_telemetry} -d agrocontrol_telemetry"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: agrocontrol-mosquitto
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  telemetry:
+    build:
+      context: .
+      dockerfile: src/telemetry/Dockerfile
+    container_name: agrocontrol-telemetry
+    restart: unless-stopped
+    environment:
+      TELEMETRY_DB_URL: jdbc:postgresql://telemetry-db:5432/agrocontrol_telemetry
+      TELEMETRY_DB_USER: ${TELEMETRY_DB_USER:-agrocontrol_telemetry}
+      TELEMETRY_DB_PASSWORD: ${TELEMETRY_DB_PASSWORD:-agrocontrol_telemetry_dev}
+      TELEMETRY_INTERNAL_API_KEY: ${TELEMETRY_INTERNAL_API_KEY:-development-only-telemetry-internal-key-change-me}
+      TELEMETRY_MQTT_BROKER_URL: tcp://mosquitto:1883
+      TELEMETRY_MQTT_ENABLED: "true"
+    ports:
+      - "${TELEMETRY_PORT:-8100}:8100"
+    depends_on:
+      telemetry-db:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8100/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   intelligence:
     build:
       context: .
@@ -26,13 +79,7 @@ services:
     ports:
       - "${INTELLIGENCE_PORT:-8090}:8090"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=2)",
-        ]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=2)"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -51,6 +98,9 @@ services:
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-agrocontrol};Username=${POSTGRES_USER:-agrocontrol};Password=${POSTGRES_PASSWORD:-agrocontrol_dev}
       Intelligence__BaseUrl: http://intelligence:8090
       Intelligence__TimeoutSeconds: ${INTELLIGENCE_TIMEOUT_SECONDS:-5}
+      Telemetry__BaseUrl: http://telemetry:8100
+      Telemetry__TimeoutSeconds: ${TELEMETRY_TIMEOUT_SECONDS:-5}
+      Telemetry__InternalApiKey: ${TELEMETRY_INTERNAL_API_KEY:-development-only-telemetry-internal-key-change-me}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
@@ -58,6 +108,9 @@ services:
         condition: service_healthy
       intelligence:
         condition: service_healthy
+      telemetry:
+        condition: service_healthy
 
 volumes:
   agrocontrol_postgres_data:
+  agrocontrol_telemetry_data:

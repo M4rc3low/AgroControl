@@ -21,7 +21,7 @@ public sealed class ModuleCatalog : IModuleCatalog
         new(ModuleKey.Irrigation, "Irrigation", ModuleStatus.Locked, "Irrigação, clima e umidade."),
         new(ModuleKey.Sustainability, "Sustainability", ModuleStatus.Locked, "Indicadores ambientais e carbono."),
         new(ModuleKey.Export, "Export", ModuleStatus.Locked, "Comércio exterior, câmbio e logística."),
-        new(ModuleKey.Telemetry, "Telemetry", ModuleStatus.Locked, "Sensores, GPS, máquinas e IoT.")
+        new(ModuleKey.Telemetry, "Telemetry", ModuleStatus.Active, "Sensores, GPS, máquinas e IoT.")
     ];
 
     public IReadOnlyCollection<ModuleDefinition> GetAll() => Modules;

@@ -98,15 +98,30 @@
 - [x] testes C# e integração PostgreSQL;
 - [x] documentação de arquitetura, contrato e limites do modelo.
 
-## Sprint 7 — AgroControl Telemetry ⏭️
+## Sprint 7 — AgroControl Telemetry ✅
 
-- [ ] Spring Boot;
-- [ ] modelo de eventos;
-- [ ] sensores e MQTT;
-- [ ] normalização;
-- [ ] integração com máquinas e talhões.
+- [x] Java 21 + Spring Boot;
+- [x] serviço independente em `src/telemetry`;
+- [x] PostgreSQL próprio do serviço;
+- [x] registro de dispositivos por organização;
+- [x] vínculos opcionais com máquina, propriedade e talhão;
+- [x] modelo de eventos append-only;
+- [x] idempotência por dispositivo + eventId;
+- [x] normalização e validação de eventos;
+- [x] Eclipse Mosquitto no ambiente de desenvolvimento;
+- [x] consumidor MQTT com QoS 1 e reconexão;
+- [x] convenção de tópicos versionada;
+- [x] última leitura e histórico por métrica;
+- [x] integração C# ↔ Java por cliente HTTP tipado;
+- [x] autenticação interna serviço-a-serviço;
+- [x] tenant definido pelo dispositivo/usuário, não pelo payload;
+- [x] proteção pelo módulo `Telemetry`;
+- [x] Dockerfile e Docker Compose;
+- [x] OpenAPI / Swagger UI;
+- [x] CI Java, PostgreSQL real e teste MQTT ponta a ponta;
+- [x] documentação de arquitetura e segurança.
 
-## Sprint 8 — Plataforma / DevOps
+## Sprint 8 — Plataforma / DevOps ⏭️
 
 - [ ] pipelines completos e imagens versionadas;
 - [ ] ambientes e secrets management;

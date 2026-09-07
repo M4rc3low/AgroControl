@@ -1,0 +1,92 @@
+name: Telemetry CI
+
+on:
+  push:
+    paths:
+      - "src/telemetry/**"
+      - "infra/mosquitto/**"
+      - ".github/workflows/telemetry-ci.yml"
+  pull_request:
+    paths:
+      - "src/telemetry/**"
+      - "infra/mosquitto/**"
+      - ".github/workflows/telemetry-ci.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: agrocontrol_telemetry_test
+          POSTGRES_USER: telemetry_test
+          POSTGRES_PASSWORD: telemetry_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U telemetry_test -d agrocontrol_telemetry_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      AGROCONTROL_TELEMETRY_TESTS: "true"
+      TELEMETRY_DB_URL: jdbc:postgresql://localhost:5434/agrocontrol_telemetry_test
+      TELEMETRY_DB_USER: telemetry_test
+      TELEMETRY_DB_PASSWORD: telemetry_test
+      TELEMETRY_MQTT_ENABLED: "false"
+      TELEMETRY_INTERNAL_API_KEY: ci-telemetry-internal-key-change-me-123456789
+    defaults:
+      run:
+        working-directory: src/telemetry
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Unit and PostgreSQL integration tests
+        run: mvn -B verify
+      - name: Build Docker image
+        working-directory: .
+        run: docker build -f src/telemetry/Dockerfile -t agrocontrol-telemetry:test .
+      - name: MQTT end-to-end smoke test
+        working-directory: .
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name agrocontrol-mosquitto-ci --network host \
+            -v "$PWD/infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" eclipse-mosquitto:2
+          docker run -d --rm --name agrocontrol-telemetry-ci --network host \
+            -e TELEMETRY_DB_URL=jdbc:postgresql://127.0.0.1:5434/agrocontrol_telemetry_test \
+            -e TELEMETRY_DB_USER=telemetry_test \
+            -e TELEMETRY_DB_PASSWORD=telemetry_test \
+            -e TELEMETRY_INTERNAL_API_KEY=ci-telemetry-internal-key-change-me-123456789 \
+            -e TELEMETRY_MQTT_ENABLED=true \
+            -e TELEMETRY_MQTT_BROKER_URL=tcp://127.0.0.1:1883 \
+            agrocontrol-telemetry:test
+          trap 'docker stop agrocontrol-telemetry-ci agrocontrol-mosquitto-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:8100/health && break
+            sleep 1
+          done
+          DEVICE_JSON=$(curl --fail --silent -X POST http://127.0.0.1:8100/api/v1/organizations/11111111-1111-1111-1111-111111111111/devices \
+            -H 'Content-Type: application/json' \
+            -H 'X-AgroControl-Internal-Key: ci-telemetry-internal-key-change-me-123456789' \
+            -d '{"externalKey":"ci-soil-01","deviceType":"FIELD_SENSOR"}')
+          DEVICE_ID=$(printf '%s' "$DEVICE_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          CAPTURED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          docker run --rm --network host eclipse-mosquitto:2 mosquitto_pub -h 127.0.0.1 \
+            -t "agrocontrol/v1/devices/$DEVICE_ID/telemetry" \
+            -m "{\"eventId\":\"ci-mqtt-1\",\"capturedAtUtc\":\"$CAPTURED_AT\",\"metric\":\"soil.moisture\",\"numericValue\":42.5,\"unit\":\"%\"}"
+          for attempt in {1..20}; do
+            LATEST=$(curl --silent -H 'X-AgroControl-Internal-Key: ci-telemetry-internal-key-change-me-123456789' \
+              "http://127.0.0.1:8100/api/v1/organizations/11111111-1111-1111-1111-111111111111/devices/$DEVICE_ID/latest?metric=soil.moisture")
+            if printf '%s' "$LATEST" | grep -q 'soil.moisture'; then
+              printf '%s\n' "$LATEST"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs agrocontrol-telemetry-ci
+          exit 1
