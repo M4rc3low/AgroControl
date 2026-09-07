@@ -33,43 +33,45 @@
 
 ## Sprint 3 — Estoque ✅
 
-- [x] itens com SKU;
-- [x] categorias de insumo;
-- [x] unidades de medida;
-- [x] depósitos/localizações;
-- [x] entradas e saídas;
-- [x] ajustes positivos e negativos;
+- [x] itens com SKU e unidades de medida;
+- [x] categorias e depósitos;
+- [x] entradas, saídas e ajustes;
 - [x] ledger append-only;
 - [x] bloqueio de saída com saldo insuficiente;
 - [x] lote e validade;
 - [x] vínculo de consumo com propriedade/talhão/safra;
 - [x] saldo por item e depósito;
-- [x] histórico paginado e filtrável;
-- [x] alertas de estoque baixo;
+- [x] histórico e alertas de estoque baixo;
 - [x] migration `InventoryCore`;
 - [x] testes unitários e integração PostgreSQL.
 
-## Sprint 4 — Financeiro ⏭️
+## Sprint 4 — Financeiro ✅
 
-- [ ] centros de custo;
-- [ ] despesas;
-- [ ] receitas;
-- [ ] contas a pagar e receber;
-- [ ] vínculo com propriedade/talhão/safra;
-- [ ] categorias financeiras;
-- [ ] custo por hectare;
-- [ ] custo por unidade produzida;
-- [ ] ponto de equilíbrio;
-- [ ] margem estimada e realizada;
-- [ ] integração futura com consumo de estoque.
+- [x] categorias financeiras;
+- [x] centros de custo;
+- [x] despesas e receitas;
+- [x] contas a pagar e receber por status;
+- [x] competência, vencimento e liquidação;
+- [x] vínculo com propriedade/talhão/safra;
+- [x] visão por competência e fluxo de caixa;
+- [x] resumo de receitas, despesas, resultado e margem;
+- [x] custo por hectare;
+- [x] custo por unidade produzida;
+- [x] ponto de equilíbrio por unidade;
+- [x] isolamento multi-tenant e bloqueio pelo módulo `Finance`;
+- [x] migration `FinanceCore`;
+- [x] testes unitários e integração PostgreSQL;
+- [x] ponto de integração futura com consumo de estoque documentado.
 
-## Sprint 5 — Machinery + Market
+## Sprint 5 — Machinery + Market ⏭️
 
 - [ ] máquinas e implementos;
 - [ ] horímetro e combustível;
-- [ ] manutenção;
+- [ ] manutenção preventiva e corretiva;
+- [ ] custos operacionais de máquinas;
 - [ ] preços de commodities;
-- [ ] histórico e alertas.
+- [ ] histórico de preços;
+- [ ] alertas de mercado.
 
 ## Sprint 6 — AgroControl Intelligence
 
