@@ -2,119 +2,95 @@
 
 ## Sprint 0 — Fundação ✅
 
-Objetivo: deixar o projeto pronto para evolução controlada.
-
-- [x] definir arquitetura;
-- [x] definir stack;
-- [x] criar estrutura do monorepo;
-- [x] criar solução C#;
-- [x] criar catálogo inicial de módulos;
+- [x] arquitetura e stack;
+- [x] monorepo e solução .NET;
+- [x] catálogo de módulos;
 - [x] health endpoint;
-- [x] Dockerfile da API;
-- [x] PostgreSQL no Docker Compose;
-- [x] documentação inicial;
-- [x] CI inicial.
+- [x] Docker/PostgreSQL;
+- [x] documentação e CI inicial.
 
 ## Sprint 1 — Identity + Organizations ✅
 
-- [x] configurar Entity Framework Core;
-- [x] criar `AgroControlDbContext`;
-- [x] configurar PostgreSQL;
-- [x] migration inicial e model snapshot;
-- [x] design-time DbContext factory;
-- [x] Organization;
-- [x] User;
-- [x] membership usuário-organização;
-- [x] papéis iniciais;
-- [x] autenticação JWT;
-- [x] hash de senha com PBKDF2-HMAC-SHA512;
-- [x] planos Basic/Pro/Intelligence/Enterprise;
-- [x] entitlement de módulos;
-- [x] overrides de módulo por organização;
-- [x] bloqueio backend com `403 Forbidden`;
-- [x] auditoria temporal básica (`CreatedAtUtc` / `UpdatedAtUtc`);
-- [x] testes unitários e CI com `dotnet test`.
+- [x] Entity Framework Core e PostgreSQL;
+- [x] `AgroControlDbContext`, migrations e design-time factory;
+- [x] Organization, User e membership;
+- [x] papéis e autenticação JWT;
+- [x] PBKDF2-HMAC-SHA512;
+- [x] planos e entitlements;
+- [x] bloqueio backend por módulo;
+- [x] testes e CI.
 
 ## Sprint 2 — Produção Rural ✅
 
-- [x] Farm;
-- [x] Field;
-- [x] Crop;
-- [x] Season;
+- [x] Farm, Field, Crop e Season;
 - [x] status de safra;
-- [x] operações CRUD;
-- [x] soft delete;
+- [x] CRUD e soft delete;
 - [x] validações de área e datas;
-- [x] validação da área acumulada dos talhões;
-- [x] isolamento multi-tenant por `OrganizationId`;
-- [x] filtro reutilizável de acesso por módulo;
+- [x] isolamento multi-tenant;
 - [x] filtros, busca e paginação;
 - [x] migration `ProductionCore`;
-- [x] testes unitários;
-- [x] teste de integração com PostgreSQL real no CI.
+- [x] testes unitários e integração PostgreSQL.
 
-## Sprint 3 — Estoque ⏭️
+## Sprint 3 — Estoque ✅
 
-- [ ] Item de estoque;
-- [ ] categorias de insumo;
-- [ ] unidades de medida;
-- [ ] depósitos/localizações;
-- [ ] entrada;
-- [ ] saída;
-- [ ] ajuste;
-- [ ] lote e validade quando aplicável;
-- [ ] vínculo de consumo com propriedade/talhão/safra;
-- [ ] saldo por propriedade e depósito;
-- [ ] histórico de movimentações;
-- [ ] alertas de estoque baixo;
-- [ ] testes e migration.
+- [x] itens com SKU;
+- [x] categorias de insumo;
+- [x] unidades de medida;
+- [x] depósitos/localizações;
+- [x] entradas e saídas;
+- [x] ajustes positivos e negativos;
+- [x] ledger append-only;
+- [x] bloqueio de saída com saldo insuficiente;
+- [x] lote e validade;
+- [x] vínculo de consumo com propriedade/talhão/safra;
+- [x] saldo por item e depósito;
+- [x] histórico paginado e filtrável;
+- [x] alertas de estoque baixo;
+- [x] migration `InventoryCore`;
+- [x] testes unitários e integração PostgreSQL.
 
-## Sprint 4 — Financeiro
+## Sprint 4 — Financeiro ⏭️
 
 - [ ] centros de custo;
 - [ ] despesas;
 - [ ] receitas;
-- [ ] vínculo com safra;
+- [ ] contas a pagar e receber;
+- [ ] vínculo com propriedade/talhão/safra;
+- [ ] categorias financeiras;
 - [ ] custo por hectare;
 - [ ] custo por unidade produzida;
 - [ ] ponto de equilíbrio;
-- [ ] margem estimada e realizada.
+- [ ] margem estimada e realizada;
+- [ ] integração futura com consumo de estoque.
 
 ## Sprint 5 — Machinery + Market
 
-- [ ] máquinas;
-- [ ] implementos;
-- [ ] horímetro;
-- [ ] combustível;
+- [ ] máquinas e implementos;
+- [ ] horímetro e combustível;
 - [ ] manutenção;
 - [ ] preços de commodities;
-- [ ] histórico;
-- [ ] alertas.
+- [ ] histórico e alertas.
 
 ## Sprint 6 — AgroControl Intelligence
 
-- [ ] criar serviço FastAPI;
+- [ ] FastAPI;
 - [ ] contrato API↔Intelligence;
 - [ ] análise exploratória;
 - [ ] previsão inicial de produtividade;
-- [ ] filas para processamento pesado, se necessário;
+- [ ] processamento assíncrono quando necessário;
 - [ ] visão computacional em fase posterior.
 
 ## Sprint 7 — AgroControl Telemetry
 
 - [ ] Spring Boot;
 - [ ] modelo de eventos;
-- [ ] ingestão de sensores;
-- [ ] MQTT;
+- [ ] sensores e MQTT;
 - [ ] normalização;
 - [ ] integração com máquinas e talhões.
 
 ## Sprint 8 — Plataforma / DevOps
 
-- [ ] pipelines completos;
-- [ ] imagens Docker versionadas;
-- [ ] ambientes;
-- [ ] secrets management;
-- [ ] OpenTelemetry;
-- [ ] métricas e Grafana;
+- [ ] pipelines completos e imagens versionadas;
+- [ ] ambientes e secrets management;
+- [ ] OpenTelemetry, métricas e Grafana;
 - [ ] Kubernetes quando o projeto justificar a orquestração.

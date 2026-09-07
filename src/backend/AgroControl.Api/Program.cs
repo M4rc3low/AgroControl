@@ -3,6 +3,7 @@ using System.Text;
 using AgroControl.Api.Auth;
 using AgroControl.Api.Endpoints;
 using AgroControl.Application.Identity;
+using AgroControl.Application.Inventory;
 using AgroControl.Application.Platform;
 using AgroControl.Application.Production;
 using AgroControl.Application.Subscriptions;
@@ -23,6 +24,7 @@ builder.Services.AddScoped<FarmService>();
 builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<SeasonService>();
+builder.Services.AddScoped<InventoryService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var jwtOptions = new JwtOptions
@@ -72,7 +74,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     service = "AgroControl.Api",
     status = "running",
-    version = "0.3.0"
+    version = "0.4.0"
 }));
 
 app.MapHealthChecks("/health");
@@ -183,6 +185,7 @@ authorized.MapGet("/platform/modules/{moduleKey}/access", async (
 });
 
 app.MapProductionEndpoints();
+app.MapInventoryEndpoints();
 
 app.Run();
 

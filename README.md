@@ -2,7 +2,7 @@
 
 **AgroControl** é uma plataforma modular para gestão e inteligência no agronegócio. O projeto começa como um **monólito modular em C# / ASP.NET Core**, mantendo pontos claros de integração com serviços especializados em **Python** (dados, IA e visão computacional) e **Java** (telemetria e IoT).
 
-> Status atual: **Sprint 2 concluída — núcleo de Produção Rural**
+> Status atual: **Sprint 3 concluída — estoque e movimentações de insumos**
 
 ## Objetivo
 
@@ -56,8 +56,7 @@ A API principal começa como um **monólito modular**. Python e Java só entram 
 ### Plataforma e segurança
 
 - solução .NET 10 organizada em Domain, Application, Infrastructure e API;
-- PostgreSQL com Entity Framework Core;
-- migrations e factory de design-time;
+- PostgreSQL com Entity Framework Core e migrations;
 - Organization, User e membership usuário-organização;
 - papéis `Owner`, `Admin`, `Manager` e `Viewer`;
 - cadastro e login com JWT;
@@ -74,17 +73,28 @@ A API principal começa como um **monólito modular**. Python e Java só entram 
 - talhões (`Field`);
 - culturas e variedades (`Crop`);
 - safras (`Season`);
-- status `Planned`, `Active`, `Harvested` e `Cancelled`;
-- CRUD completo com soft delete;
-- paginação, busca e filtros;
-- isolamento de dados por `OrganizationId`;
-- validação para que a soma dos talhões ativos não ultrapasse a área da propriedade;
+- CRUD com soft delete, paginação, busca e filtros;
+- isolamento por `OrganizationId`;
+- validação para a soma dos talhões ativos não ultrapassar a área da propriedade;
 - produtividade esperada e realizada por hectare.
+
+### Estoque
+
+- categorias de insumo;
+- itens com SKU, unidade de medida e estoque mínimo;
+- depósitos, opcionalmente vinculados a propriedades;
+- entradas, saídas e ajustes registrados em ledger append-only;
+- saldo calculado pelo histórico de movimentações;
+- bloqueio de saída quando o saldo é insuficiente;
+- lote e validade opcionais com regra de rastreabilidade;
+- vínculo opcional do consumo com propriedade, talhão e safra;
+- consulta de estoque baixo;
+- paginação e filtros de movimentações.
 
 ### Qualidade
 
-- testes unitários de domínio e infraestrutura de segurança;
-- teste de integração com PostgreSQL real;
+- testes unitários de domínio e segurança;
+- testes de integração com PostgreSQL real;
 - CI provisionando PostgreSQL 17 e executando restore, build e test.
 
 ## Módulos e planos
@@ -105,7 +115,7 @@ Tudo do Pro + Intelligence e Telemetry.
 
 Todos os módulos, incluindo Export.
 
-Veja [`docs/MODULES.md`](docs/MODULES.md), [`docs/SPRINT_1_IDENTITY.md`](docs/SPRINT_1_IDENTITY.md) e [`docs/SPRINT_2_PRODUCTION.md`](docs/SPRINT_2_PRODUCTION.md).
+Veja [`docs/MODULES.md`](docs/MODULES.md), [`docs/SPRINT_1_IDENTITY.md`](docs/SPRINT_1_IDENTITY.md), [`docs/SPRINT_2_PRODUCTION.md`](docs/SPRINT_2_PRODUCTION.md) e [`docs/SPRINT_3_INVENTORY.md`](docs/SPRINT_3_INVENTORY.md).
 
 ## Executando com Docker
 
@@ -136,8 +146,6 @@ GET  /api/v1/platform/modules/{moduleKey}/access
 
 ### Produção rural
 
-Cada recurso possui `GET`, `GET /{id}`, `POST`, `PUT /{id}` e `DELETE /{id}`:
-
 ```text
 /api/v1/farms
 /api/v1/fields
@@ -145,36 +153,23 @@ Cada recurso possui `GET`, `GET /{id}`, `POST`, `PUT /{id}` e `DELETE /{id}`:
 /api/v1/seasons
 ```
 
-As listagens aceitam paginação e busca. Talhões podem ser filtrados por `farmId`; safras por `fieldId` e `status`.
+### Estoque
 
-Exemplo de cadastro inicial:
-
-```json
-{
-  "organizationName": "Fazenda Santa Clara",
-  "displayName": "Administrador",
-  "email": "admin@fazenda.local",
-  "password": "TroqueEstaSenha123!"
-}
+```text
+/api/v1/inventory/categories
+/api/v1/inventory/items
+/api/v1/inventory/warehouses
+/api/v1/inventory/movements
+/api/v1/inventory/low-stock
 ```
 
-O cadastro cria automaticamente a organização, o primeiro usuário como `Owner` e uma assinatura `Basic` ativa.
-
-Exemplo de propriedade:
-
-```json
-{
-  "name": "Fazenda Santa Clara",
-  "totalAreaHectares": 485.5,
-  "city": "Rio Verde",
-  "state": "GO"
-}
-```
+Consulte [`docs/SPRINT_3_INVENTORY.md`](docs/SPRINT_3_INVENTORY.md) para os contratos e regras do estoque.
 
 ## Migrations
 
 - `20260907002000_InitialIdentity`
 - `20260907010000_ProductionCore`
+- `20260907134514_InventoryCore`
 
 No Docker Compose, as migrations são aplicadas automaticamente porque `Database__ApplyMigrations=true`.
 
@@ -187,8 +182,8 @@ A chave de `appsettings.Development.json` é apenas uma chave conhecida de desen
 1. ✅ **Sprint 0** — fundação, documentação, arquitetura, CI e containers.
 2. ✅ **Sprint 1** — identidade, organizações, PostgreSQL e autorização por módulo.
 3. ✅ **Sprint 2** — propriedades, talhões, culturas e safras.
-4. ⏭️ **Sprint 3** — estoque e movimentações de insumos.
-5. **Sprint 4** — financeiro.
+4. ✅ **Sprint 3** — estoque e movimentações de insumos.
+5. ⏭️ **Sprint 4** — financeiro.
 6. **Sprint 5** — máquinas e mercado.
 7. **Sprint 6** — serviço Python de inteligência.
 8. **Sprint 7** — serviço Java de telemetria.
