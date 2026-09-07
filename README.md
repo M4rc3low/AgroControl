@@ -1,12 +1,12 @@
 # AgroControl
 
-**AgroControl** é uma plataforma modular para gestão, inteligência e tecnologia no agronegócio. O núcleo operacional permanece como um **monólito modular em C# / ASP.NET Core**, enquanto responsabilidades tecnicamente distintas são isoladas em serviços especializados: **Python / FastAPI** para inteligência de dados e **Java / Spring Boot** para telemetria e IoT.
+**AgroControl** é uma plataforma modular para gestão, inteligência e tecnologia no agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**; responsabilidades tecnicamente distintas são isoladas em serviços especializados: **Python / FastAPI** para inteligência de dados e **Java / Spring Boot** para telemetria e IoT.
 
-> Status atual: **Sprint 8 em validação — observabilidade, CI/CD, segurança operacional e Kubernetes**
+> Status atual: **Sprint 8 concluída — observabilidade, CI/CD, segurança operacional e Kubernetes**
 
 ## Objetivo
 
-Centralizar os principais fluxos de uma operação rural em uma única plataforma, sem transformar o projeto prematuramente em uma arquitetura de microserviços complexa:
+Centralizar os principais fluxos de uma operação rural em uma única plataforma:
 
 - propriedades, talhões, culturas e safras;
 - estoque e movimentações de insumos;
@@ -15,7 +15,7 @@ Centralizar os principais fluxos de uma operação rural em uma única plataform
 - commodities e alertas de mercado;
 - análise de dados e previsão de produtividade;
 - sensores, GPS, estações e telemetria;
-- agricultura de precisão, irrigação, sustentabilidade e exportação em fases posteriores.
+- módulos futuros de agricultura de precisão, irrigação, sustentabilidade e exportação.
 
 Os módulos são liberados por plano e o bloqueio é validado no backend, não apenas na interface.
 
@@ -31,7 +31,6 @@ Os módulos são liberados por plano e o bloqueio é validado no backend, não a
 | Banco de telemetria | PostgreSQL dedicado |
 | Mensageria IoT | MQTT + Eclipse Mosquitto |
 | Autenticação | JWT |
-| Comunicação interna | HTTP tipado + credencial serviço-a-serviço |
 | Containers | Docker / Docker Compose |
 | Observabilidade | OpenTelemetry + Prometheus + Tempo + Grafana |
 | CI/CD | GitHub Actions + GHCR |
@@ -59,24 +58,21 @@ flowchart TB
     TEMPO --> GRAFANA
 ```
 
-A API principal é responsável por identidade, assinatura, autorização, `OrganizationId` e regras centrais de negócio. Python cuida de análise/modelagem. Java cuida de ingestão, normalização e histórico de telemetria e **não escreve diretamente no schema do monólito**.
+A API principal concentra identidade, assinatura, autorização, `OrganizationId` e regras centrais de negócio. Python cuida de análise/modelagem. Java cuida de ingestão, normalização e histórico de telemetria e **não escreve diretamente no schema do monólito**.
 
-## O que já funciona
+## Funcionalidades implementadas
 
-### Plataforma e segurança
+### Plataforma, identidade e multi-tenancy
 
-- solução .NET 10 separada em Domain, Application, Infrastructure e API;
-- PostgreSQL com EF Core e migrations;
 - Organization, User e membership usuário-organização;
 - papéis `Owner`, `Admin`, `Manager` e `Viewer`;
 - cadastro e login com JWT;
-- PBKDF2-HMAC-SHA512 com salt aleatório para senha;
+- PBKDF2-HMAC-SHA512 com salt aleatório;
 - planos `Basic`, `Pro`, `Intelligence` e `Enterprise`;
 - entitlements e overrides por organização;
-- bloqueio de módulos no backend;
-- isolamento multi-tenant por `OrganizationId`.
+- isolamento por `OrganizationId` e bloqueio de módulos no backend.
 
-### Produção Rural
+### Produção rural
 
 - propriedades (`Farm`), talhões (`Field`), culturas (`Crop`) e safras (`Season`);
 - CRUD, soft delete, paginação, busca e filtros;
@@ -85,15 +81,14 @@ A API principal é responsável por identidade, assinatura, autorização, `Orga
 
 ### Estoque
 
-- categorias, itens, SKU, unidades de medida e depósitos;
+- categorias, itens, SKU, unidades e depósitos;
 - entradas, saídas e ajustes em ledger append-only;
 - saldo por item/depósito e bloqueio de estoque negativo;
-- lote, validade e consumo associado à propriedade, talhão ou safra;
-- alertas de estoque baixo.
+- lote, validade, consumo por propriedade/talhão/safra e alertas de estoque baixo.
 
 ### Financeiro
 
-- categorias financeiras e centros de custo;
+- categorias e centros de custo;
 - despesas, receitas, contas a pagar e receber;
 - competência, vencimento e liquidação;
 - vínculo com propriedade, talhão e safra;
@@ -101,11 +96,11 @@ A API principal é responsável por identidade, assinatura, autorização, `Orga
 
 ### Máquinas e mercado
 
-- máquinas, implementos, status, horímetro, combustível e manutenção;
+- máquinas, implementos, horímetro, combustível e manutenção;
 - manutenção preventiva/corretiva e custos por máquina;
 - commodities por organização;
 - cotações append-only, variação e alertas por preço-alvo;
-- contrato preparado para provedores externos de cotação.
+- contrato preparado para provedores externos de mercado.
 
 ### AgroControl Intelligence
 
@@ -113,11 +108,10 @@ A API principal é responsável por identidade, assinatura, autorização, `Orga
 - contrato HTTP versionado `v1`;
 - baseline por produtividade esperada ou média histórica;
 - regressão Ridge comparada ao baseline;
-- MAE e RMSE quando há histórico suficiente;
-- `insufficient_data` quando não existe base confiável;
-- dataset limitado à organização e cultura corretas;
+- MAE/RMSE quando existe histórico suficiente;
+- retorno explícito `insufficient_data` quando não há base confiável;
 - cliente HTTP tipado, timeout e tratamento de indisponibilidade;
-- Docker e CI próprio.
+- isolamento multi-tenant antes da chamada ao serviço.
 
 A previsão é **apoio à decisão** e não substitui avaliação agronômica profissional nem representa garantia de produtividade.
 
@@ -131,31 +125,27 @@ A previsão é **apoio à decisão** e não substitui avaliação agronômica pr
 - tópico `agrocontrol/v1/devices/{deviceId}/telemetry`;
 - validação de timestamp, valor, unidade, coordenadas, metadata e tamanho de payload;
 - API interna com credencial serviço-a-serviço;
-- endpoints do AgroControl protegidos por JWT + entitlement `Telemetry`;
-- tenant resolvido pelo dispositivo/usuário, nunca por `OrganizationId` arbitrário no payload.
+- endpoints externos protegidos por JWT + entitlement `Telemetry`.
 
-O Mosquitto do repositório é **somente para desenvolvimento**. Produção exige TLS, identidade por dispositivo/gateway, ACLs, rotação de credenciais, rate limiting e operação apropriada do broker.
+O Mosquitto do repositório é **somente para desenvolvimento**. Produção exige TLS, identidade por dispositivo/gateway, ACLs, rotação de credenciais e operação apropriada do broker.
 
-### Plataforma DevOps e observabilidade
+### DevOps e observabilidade
 
 - OpenTelemetry na API C#, Intelligence Python e Telemetry Java;
-- propagação de traces nas chamadas HTTP instrumentadas;
+- traces distribuídos nas chamadas HTTP instrumentadas;
 - logs JSON na API principal;
 - liveness e readiness separados;
-- readiness da API verifica PostgreSQL;
+- readiness da API validando PostgreSQL;
 - Spring Boot Actuator + Prometheus no Telemetry;
 - OpenTelemetry Collector, Tempo, Prometheus e Grafana em profile opcional;
-- dashboard operacional inicial provisionado automaticamente;
-- Platform CI sobe a stack completa e executa smoke tests;
-- Dependabot para NuGet, pip, Maven e GitHub Actions;
-- CodeQL para C#, Java/Kotlin e Python;
-- imagens Docker preparadas para publicação no GHCR por SHA/SemVer com provenance e SBOM;
-- manifests Kubernetes com Kustomize, probes, resources, security context e PDB;
+- dashboard operacional provisionado automaticamente;
+- Platform CI com build e smoke test da stack integrada;
+- Dependabot e CodeQL para C#, Java/Kotlin e Python;
+- publicação de imagens preparada no GHCR por SHA/SemVer com provenance e SBOM;
+- Kubernetes com Kustomize, probes, resources, security context e PDB;
 - PostgreSQL e MQTT de produção deliberadamente fora dos manifests simplificados.
 
 ## Executando localmente
-
-Copie `.env.example` para `.env` e substitua os valores de desenvolvimento que desejar:
 
 ```bash
 cp .env.example .env
@@ -173,7 +163,7 @@ PostgreSQL Telemetry     localhost:5433
 MQTT / Mosquitto         localhost:1883
 ```
 
-Para ligar a stack de observabilidade:
+Para ativar a stack de observabilidade:
 
 ```bash
 OTEL_ENABLED=true docker compose --profile observability up --build
@@ -201,21 +191,13 @@ Telemetry    GET /actuator/prometheus
 
 ## Endpoints principais
 
-### Plataforma
-
 ```text
-GET  /health
-GET  /api/v1/platform/modules
 POST /api/v1/auth/register
 POST /api/v1/auth/login
 GET  /api/v1/me
 GET  /api/v1/organizations/current
 GET  /api/v1/platform/entitlements
-```
 
-### Domínio operacional
-
-```text
 /api/v1/farms
 /api/v1/fields
 /api/v1/crops
@@ -224,26 +206,9 @@ GET  /api/v1/platform/entitlements
 /api/v1/finance/*
 /api/v1/machinery/*
 /api/v1/market/*
-```
 
-### Intelligence
-
-```text
 POST /api/v1/intelligence/seasons/{seasonId}/yield-prediction
-GET  /api/v1/model                         # serviço Python
-POST /api/v1/yield/predict                 # serviço Python
-```
-
-### Telemetry
-
-```text
-GET   /api/v1/telemetry/devices
-POST  /api/v1/telemetry/devices
-GET   /api/v1/telemetry/devices/{deviceId}
-PATCH /api/v1/telemetry/devices/{deviceId}/status
-POST  /api/v1/telemetry/devices/{deviceId}/events
-GET   /api/v1/telemetry/devices/{deviceId}/latest
-GET   /api/v1/telemetry/devices/{deviceId}/events
+/api/v1/telemetry/*
 ```
 
 Swagger UI do Telemetry:
@@ -254,43 +219,33 @@ http://localhost:8100/swagger-ui.html
 
 ## Kubernetes
 
-Os manifests ficam em `k8s/`. A base pode ser renderizada sem aplicar nada:
+A base fica em `k8s/` e pode ser renderizada sem aplicar recursos:
 
 ```bash
 kubectl kustomize k8s/base
 kubectl kustomize k8s/overlays/local
 ```
 
-Consulte [`k8s/README.md`](k8s/README.md) antes de implantar. Segredos reais não entram no repositório, e os manifests não criam um PostgreSQL ou broker MQTT de produção ficticiamente "pronto".
+Consulte [`k8s/README.md`](k8s/README.md) antes de implantar. Segredos reais não entram no repositório.
 
 ## Qualidade e CI/CD
 
-- Backend CI: PostgreSQL 17, restore, build e testes .NET;
-- Intelligence CI: Ruff, pytest, imagem e smoke test;
-- Telemetry CI: Maven, PostgreSQL 17, imagem e MQTT ponta a ponta;
-- Platform CI: Docker Compose completo, observabilidade, Kustomize e smoke tests integrados;
-- CodeQL e Dependabot;
-- publicação GHCR preparada para `main` e tags `v*`.
+- **Backend CI:** PostgreSQL 17, restore, build e testes .NET;
+- **Intelligence CI:** Ruff, pytest, build de imagem e smoke test;
+- **Telemetry CI:** Maven, PostgreSQL 17, build de imagem e MQTT ponta a ponta;
+- **Platform CI:** Docker Compose completo, observabilidade, Kustomize e smoke tests integrados;
+- **CodeQL:** C#, Java/Kotlin e Python;
+- **Dependabot:** NuGet, pip, Maven e GitHub Actions.
+
+A Sprint 8 foi integrada após todos os checks do PR #17 concluírem com sucesso.
 
 ## Documentação
 
-Consulte [`docs/`](docs/), especialmente:
-
-- [`SPRINT_6_INTELLIGENCE.md`](docs/SPRINT_6_INTELLIGENCE.md)
-- [`SPRINT_7_TELEMETRY.md`](docs/SPRINT_7_TELEMETRY.md)
-- [`SPRINT_8_PLATFORM_DEVOPS.md`](docs/SPRINT_8_PLATFORM_DEVOPS.md)
-- [`ROADMAP.md`](docs/ROADMAP.md)
-- [`ADR-005`](docs/adr/ADR-005-observability-and-kubernetes.md)
-
-## Migrations do banco principal
-
-- `20260907002000_InitialIdentity`
-- `20260907010000_ProductionCore`
-- `20260907134514_InventoryCore`
-- `20260907191652_FinanceCore`
-- `20260907195304_MachineryMarketCore`
-
-Intelligence não precisa de schema próprio. Telemetry possui banco separado e inicializa seu schema no serviço Java.
+- [`docs/SPRINT_6_INTELLIGENCE.md`](docs/SPRINT_6_INTELLIGENCE.md)
+- [`docs/SPRINT_7_TELEMETRY.md`](docs/SPRINT_7_TELEMETRY.md)
+- [`docs/SPRINT_8_PLATFORM_DEVOPS.md`](docs/SPRINT_8_PLATFORM_DEVOPS.md)
+- [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- [`docs/adr/ADR-005-observability-and-kubernetes.md`](docs/adr/ADR-005-observability-and-kubernetes.md)
 
 ## Roadmap resumido
 
@@ -302,7 +257,9 @@ Intelligence não precisa de schema próprio. Telemetry possui banco separado e 
 6. ✅ **Sprint 5** — máquinas e mercado.
 7. ✅ **Sprint 6** — Python / Intelligence.
 8. ✅ **Sprint 7** — Java / Telemetry / MQTT.
-9. 🔄 **Sprint 8** — observabilidade, CI/CD, segurança operacional e Kubernetes; implementação pronta, em validação de PR.
+9. ✅ **Sprint 8** — observabilidade, CI/CD, segurança operacional e Kubernetes.
+
+O hardening que depende de ambiente real, política operacional ou testes de carga está separado no issue **#18**.
 
 ## Segurança
 
