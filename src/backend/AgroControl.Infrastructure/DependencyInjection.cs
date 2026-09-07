@@ -2,6 +2,8 @@ using AgroControl.Application.Common;
 using AgroControl.Application.Finance;
 using AgroControl.Application.Identity;
 using AgroControl.Application.Inventory;
+using AgroControl.Application.Machinery;
+using AgroControl.Application.Market;
 using AgroControl.Application.Production;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Infrastructure.Persistence;
@@ -25,6 +27,8 @@ public static class DependencyInjection
         services.AddScoped<IProductionRepository, ProductionRepository>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IFinanceRepository, FinanceRepository>();
+        services.AddScoped<IMachineryRepository, MachineryRepository>();
+        services.AddScoped<IMarketRepository, MarketRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         return services;
