@@ -7,7 +7,7 @@ Frontend oficial do AgroControl em **React + TypeScript + Vite**.
 Com a API principal disponível em `http://localhost:8080`:
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -20,6 +20,8 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+As dependências são reproduzidas por `package-lock.json` e o CI usa `npm ci`.
 
 ## Produção
 

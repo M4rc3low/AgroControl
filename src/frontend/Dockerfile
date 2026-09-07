@@ -1,7 +1,7 @@
 FROM node:24-alpine AS build
 WORKDIR /app
-COPY src/frontend/package.json ./package.json
-RUN npm install --no-audit --no-fund
+COPY src/frontend/package.json src/frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 COPY src/frontend/ .
 RUN npm run build
 

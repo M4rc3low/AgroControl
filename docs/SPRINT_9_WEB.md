@@ -12,15 +12,15 @@ A Sprint 9 transforma a base de backend e plataforma em uma aplicação utilizá
 - React Router 7;
 - CSS próprio, sem framework pesado de componentes;
 - Node 24 no build;
-- Nginx unprivileged para a imagem de produção.
+- Nginx unprivileged na imagem de produção.
 
-As versões são fixadas diretamente no `package.json`. Um lockfile deve ser incorporado quando o fluxo de atualização de dependências estiver estabilizado; até lá o CI usa `npm install` e Dependabot acompanha o ecossistema npm.
+As versões diretas estão fixadas no `package.json` e o grafo transitivo é travado por `package-lock.json`. Desenvolvimento, CI e imagem Docker utilizam `npm ci` para builds reproduzíveis.
 
 ## Arquitetura da sessão
 
-O login e o registro usam os endpoints existentes da API. O token JWT fica em `sessionStorage`, é enviado como `Bearer` pelo cliente HTTP e é descartado quando expira ou quando a API retorna `401`.
+Login e registro usam os endpoints existentes da API. O token JWT fica em `sessionStorage`, é enviado como `Bearer` pelo cliente HTTP e é descartado quando expira ou quando a API retorna `401`.
 
-Essa escolha é coerente com o contrato atual da API, mas não é apresentada como solução final para qualquer nível de risco. Se o AgroControl evoluir para uma aplicação pública exposta a usuários externos, deve-se avaliar BFF/cookie HttpOnly, refresh token com rotação e política de CSP mais restrita.
+Essa escolha é coerente com o contrato atual da API, mas não é tratada como solução universal. Caso o AgroControl evolua para uma aplicação pública com superfície de risco maior, deve-se avaliar BFF/cookie HttpOnly, refresh token com rotação e CSP mais restrita.
 
 ## Mesmo origin em produção
 
@@ -40,9 +40,9 @@ AgroControl Web / Nginx
 
 ## Design e UX
 
-A interface usa identidade visual própria: navegação lateral, contexto da organização, plano, usuário, estados de módulo e layout responsivo. Não foi introduzida uma biblioteca visual grande somente para acelerar a primeira tela; isso mantém o bundle menor e evita acoplamento precoce.
+A interface possui identidade visual própria: navegação lateral, contexto da organização, plano, usuário, estados de módulo e layout responsivo. Não foi introduzida uma biblioteca visual grande somente para acelerar a primeira tela; isso reduz acoplamento e mantém o sistema de componentes sob controle do produto.
 
-Estados essenciais estão previstos: carregamento, vazio, erro, bloqueio por plano e confirmação de desativação.
+Estados essenciais estão implementados: carregamento, vazio, erro, bloqueio por plano e confirmação de desativação. Há foco visível e navegação sem depender exclusivamente de mouse.
 
 ## Dashboard
 
@@ -54,7 +54,7 @@ O dashboard consulta dados reais da API:
 - alertas de estoque baixo quando `Inventory` está habilitado;
 - resumo financeiro quando `Finance` está habilitado.
 
-Chamadas opcionais degradam de forma independente. Um problema no Finance, por exemplo, não deve esconder toda a visão de produção.
+Chamadas opcionais degradam de forma independente. Uma indisponibilidade no Finance, por exemplo, não esconde a visão de produção.
 
 ## Produção rural
 
@@ -65,35 +65,35 @@ A Sprint entrega fluxos web reais para:
 - `Crop`: listar, buscar, criar, editar e desativar;
 - `Season`: listar, filtrar, criar, editar status/produtividade e desativar.
 
-As relações de organização continuam sendo impostas pelo backend. O frontend apenas envia IDs selecionados dentro do contexto carregado.
+As relações de organização continuam sendo impostas pelo backend. O frontend envia apenas IDs selecionados dentro do contexto carregado.
 
 ## Módulos e entitlement
 
-A sidebar e o catálogo mostram acesso habilitado/bloqueado para orientar navegação. Isso **não substitui autorização**. Um usuário que tentar chamar diretamente um endpoint sem entitlement continua sujeito ao `403` do backend.
+A sidebar e o catálogo mostram acesso habilitado/bloqueado para orientar navegação. Isso **não substitui autorização**. Uma chamada direta a endpoint sem entitlement continua sujeita ao `403` do backend.
 
-Estoque, Financeiro, Máquinas, Mercado, Intelligence e Telemetry recebem páginas de entrada nesta Sprint; os fluxos operacionais detalhados desses módulos podem ser aprofundados em incrementos posteriores.
+Estoque, Financeiro, Máquinas, Mercado, Intelligence e Telemetry recebem páginas de entrada nesta Sprint. Seus fluxos operacionais completos podem evoluir em incrementos posteriores sem comprometer a navegação principal.
 
 ## Container e Kubernetes
 
 A imagem final usa `nginxinc/nginx-unprivileged`, porta `8080` e usuário não-root. O Docker Compose expõe a web em `http://localhost:3001` por padrão.
 
-Kubernetes recebe `Deployment` e `Service` próprios para `agrocontrol-web`, probes HTTP, requests/limits, usuário não-root, capabilities removidas e PDB. O upstream interno é o Service `agrocontrol-api:8080`.
+Kubernetes possui `Deployment` e `Service` próprios para `agrocontrol-web`, probes HTTP, requests/limits, usuário não-root, capabilities removidas e PDB. O upstream interno é o Service `agrocontrol-api:8080`.
 
-## CI/CD
+## CI/CD e segurança de código
 
 `Frontend CI` executa:
 
-1. instalação de dependências;
+1. `npm ci` com cache do npm;
 2. type-check;
 3. testes unitários;
 4. build de produção;
 5. build da imagem;
 6. smoke test do container Nginx.
 
-`Platform CI` passa a construir e iniciar também a web, validar a página principal e testar o proxy `/api` através do Nginx.
+`Platform CI` constrói e inicia também a web, valida a página principal e testa o proxy `/api` através do Nginx.
 
-A publicação no GHCR inclui `agrocontrol-web` junto às imagens da API, Intelligence e Telemetry.
+CodeQL inclui JavaScript/TypeScript além de C#, Java/Kotlin e Python. Dependabot acompanha npm. A publicação no GHCR inclui `agrocontrol-web` junto às imagens da API, Intelligence e Telemetry, com a mesma estratégia de SHA/SemVer, provenance e SBOM.
 
 ## Limites conscientes
 
-Não entram nesta Sprint mapas GIS, PWA/offline-first, app móvel nativo, white-label nem uma suíte visual completa para todos os módulos. A prioridade é entregar uma fundação web utilizável e tecnicamente coerente com a plataforma já existente.
+Não entram nesta Sprint mapas GIS, PWA/offline-first, app móvel nativo, white-label nem uma suíte visual completa para todos os módulos. A prioridade é entregar uma fundação web utilizável e tecnicamente coerente com a plataforma existente.
