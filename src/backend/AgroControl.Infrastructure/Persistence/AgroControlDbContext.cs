@@ -1,6 +1,7 @@
 using AgroControl.Domain.Modules.Crops;
 using AgroControl.Domain.Modules.Farms;
 using AgroControl.Domain.Modules.Fields;
+using AgroControl.Domain.Modules.Finance;
 using AgroControl.Domain.Modules.Identity;
 using AgroControl.Domain.Modules.Inventory;
 using AgroControl.Domain.Modules.Organizations;
@@ -25,6 +26,9 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<FinancialCategory> FinancialCategories => Set<FinancialCategory>();
+    public DbSet<CostCenter> CostCenters => Set<CostCenter>();
+    public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -99,6 +103,40 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
             entity.ToTable("stock_movements"); entity.HasKey(x => x.Id); entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired(); entity.Property(x => x.Quantity).HasPrecision(18, 4).IsRequired(); entity.Property(x => x.BatchNumber).HasMaxLength(120); entity.Property(x => x.Notes).HasMaxLength(1000); entity.Ignore(x => x.SignedQuantity);
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasOne<InventoryItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Season>().WithMany().HasForeignKey(x => x.SeasonId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.ItemId); entity.HasIndex(x => x.WarehouseId); entity.HasIndex(x => new { x.OrganizationId, x.ItemId, x.WarehouseId, x.OccurredAtUtc }); entity.HasIndex(x => x.BatchNumber);
+        });
+        modelBuilder.Entity<FinancialCategory>(entity =>
+        {
+            entity.ToTable("financial_categories"); entity.HasKey(x => x.Id); entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => new { x.OrganizationId, x.Name }).IsUnique();
+        });
+        modelBuilder.Entity<CostCenter>(entity =>
+        {
+            entity.ToTable("cost_centers"); entity.HasKey(x => x.Id); entity.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => new { x.OrganizationId, x.Name }).IsUnique();
+        });
+        modelBuilder.Entity<FinancialTransaction>(entity =>
+        {
+            entity.ToTable("financial_transactions"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.Counterparty).HasMaxLength(200);
+            entity.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<FinancialCategory>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CostCenter>().WithMany().HasForeignKey(x => x.CostCenterId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Season>().WithMany().HasForeignKey(x => x.SeasonId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => x.CategoryId);
+            entity.HasIndex(x => x.CostCenterId);
+            entity.HasIndex(x => x.FarmId);
+            entity.HasIndex(x => x.FieldId);
+            entity.HasIndex(x => x.SeasonId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Type, x.Status, x.CompetenceDate });
+            entity.HasIndex(x => new { x.OrganizationId, x.DueDate });
         });
     }
 }
