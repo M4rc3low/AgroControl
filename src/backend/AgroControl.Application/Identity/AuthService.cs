@@ -128,6 +128,13 @@ public sealed class AuthService
         if (string.IsNullOrWhiteSpace(slug))
             slug = "organization";
 
-        return $"{slug}-{Guid.NewGuid():N}"[..Math.Min(slug.Length + 9, slug.Length + 33)];
+        const int suffixLength = 9; // '-' + 8 hex chars
+        const int maxSlugLength = 180;
+        var maxBaseLength = maxSlugLength - suffixLength;
+        if (slug.Length > maxBaseLength)
+            slug = slug[..maxBaseLength].TrimEnd('-');
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        return $"{slug}-{suffix}";
     }
 }
