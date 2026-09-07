@@ -2,7 +2,7 @@
 
 **AgroControl** é uma plataforma modular para gestão e inteligência no agronegócio. O projeto começa como um **monólito modular em C# / ASP.NET Core**, mantendo pontos claros de integração com serviços especializados em **Python** (dados, IA e visão computacional) e **Java** (telemetria e IoT).
 
-> Status atual: **Sprint 3 concluída — estoque e movimentações de insumos**
+> Status atual: **Sprint 4 concluída — financeiro, fluxo de caixa e rentabilidade por safra**
 
 ## Objetivo
 
@@ -11,7 +11,7 @@ Centralizar, em uma única plataforma, os principais fluxos de uma operação ru
 - gestão de propriedades e talhões;
 - culturas e safras;
 - estoque de insumos;
-- custos e resultado financeiro;
+- custos, receitas e resultado financeiro;
 - máquinas e manutenção;
 - mercado e commodities;
 - agricultura de precisão;
@@ -63,33 +63,37 @@ A API principal começa como um **monólito modular**. Python e Java só entram 
 - senha protegida com PBKDF2-HMAC-SHA512 e salt aleatório;
 - planos `Basic`, `Pro`, `Intelligence` e `Enterprise`;
 - entitlements e overrides por organização;
-- filtro reutilizável de acesso aos módulos;
-- retorno `403 Forbidden` para módulo não habilitado;
+- bloqueio de módulos também no backend;
 - Docker Compose com aplicação automática das migrations.
 
 ### Produção Rural
 
-- propriedades (`Farm`);
-- talhões (`Field`);
-- culturas e variedades (`Crop`);
-- safras (`Season`);
+- propriedades (`Farm`), talhões (`Field`), culturas (`Crop`) e safras (`Season`);
 - CRUD com soft delete, paginação, busca e filtros;
 - isolamento por `OrganizationId`;
-- validação para a soma dos talhões ativos não ultrapassar a área da propriedade;
+- validação de área dos talhões;
 - produtividade esperada e realizada por hectare.
 
 ### Estoque
 
-- categorias de insumo;
-- itens com SKU, unidade de medida e estoque mínimo;
-- depósitos, opcionalmente vinculados a propriedades;
-- entradas, saídas e ajustes registrados em ledger append-only;
-- saldo calculado pelo histórico de movimentações;
-- bloqueio de saída quando o saldo é insuficiente;
-- lote e validade opcionais com regra de rastreabilidade;
-- vínculo opcional do consumo com propriedade, talhão e safra;
-- consulta de estoque baixo;
-- paginação e filtros de movimentações.
+- categorias, itens com SKU e unidades de medida;
+- depósitos vinculáveis a propriedades;
+- entradas, saídas e ajustes em ledger append-only;
+- saldo por item/depósito e bloqueio de estoque negativo;
+- lote, validade e vínculo de consumo com propriedade/talhão/safra;
+- alertas de estoque baixo.
+
+### Financeiro
+
+- categorias financeiras e centros de custo;
+- despesas e receitas;
+- contas pendentes, pagas, recebidas e canceladas;
+- datas de competência, vencimento e liquidação;
+- separação entre visão por competência e fluxo de caixa;
+- vínculo opcional com propriedade, talhão e safra;
+- resumo de receitas, despesas, resultado, margem, contas a pagar e a receber;
+- resumo econômico por safra com custo por hectare, custo por unidade produzida e ponto de equilíbrio;
+- isolamento multi-tenant e proteção pelo módulo `Finance`.
 
 ### Qualidade
 
@@ -115,7 +119,7 @@ Tudo do Pro + Intelligence e Telemetry.
 
 Todos os módulos, incluindo Export.
 
-Veja [`docs/MODULES.md`](docs/MODULES.md), [`docs/SPRINT_1_IDENTITY.md`](docs/SPRINT_1_IDENTITY.md), [`docs/SPRINT_2_PRODUCTION.md`](docs/SPRINT_2_PRODUCTION.md) e [`docs/SPRINT_3_INVENTORY.md`](docs/SPRINT_3_INVENTORY.md).
+Documentação detalhada em [`docs/`](docs/), incluindo [`SPRINT_3_INVENTORY.md`](docs/SPRINT_3_INVENTORY.md) e [`SPRINT_4_FINANCE.md`](docs/SPRINT_4_FINANCE.md).
 
 ## Executando com Docker
 
@@ -163,13 +167,24 @@ GET  /api/v1/platform/modules/{moduleKey}/access
 /api/v1/inventory/low-stock
 ```
 
-Consulte [`docs/SPRINT_3_INVENTORY.md`](docs/SPRINT_3_INVENTORY.md) para os contratos e regras do estoque.
+### Financeiro
+
+```text
+/api/v1/finance/categories
+/api/v1/finance/cost-centers
+/api/v1/finance/transactions
+/api/v1/finance/summary
+/api/v1/finance/seasons/{seasonId}/summary
+```
+
+Consulte [`docs/SPRINT_4_FINANCE.md`](docs/SPRINT_4_FINANCE.md) para contratos, regras e indicadores.
 
 ## Migrations
 
 - `20260907002000_InitialIdentity`
 - `20260907010000_ProductionCore`
 - `20260907134514_InventoryCore`
+- `20260907191652_FinanceCore`
 
 No Docker Compose, as migrations são aplicadas automaticamente porque `Database__ApplyMigrations=true`.
 
@@ -183,8 +198,8 @@ A chave de `appsettings.Development.json` é apenas uma chave conhecida de desen
 2. ✅ **Sprint 1** — identidade, organizações, PostgreSQL e autorização por módulo.
 3. ✅ **Sprint 2** — propriedades, talhões, culturas e safras.
 4. ✅ **Sprint 3** — estoque e movimentações de insumos.
-5. ⏭️ **Sprint 4** — financeiro.
-6. **Sprint 5** — máquinas e mercado.
+5. ✅ **Sprint 4** — financeiro e rentabilidade por safra.
+6. ⏭️ **Sprint 5** — máquinas e mercado.
 7. **Sprint 6** — serviço Python de inteligência.
 8. **Sprint 7** — serviço Java de telemetria.
 9. **Sprint 8** — observabilidade, CI/CD avançado e Kubernetes.
