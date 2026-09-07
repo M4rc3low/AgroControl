@@ -3,7 +3,6 @@ package com.agrocontrol.telemetry.mqtt;
 import com.agrocontrol.telemetry.api.TelemetryContracts.TelemetryEventRequest;
 import com.agrocontrol.telemetry.config.MqttProperties;
 import com.agrocontrol.telemetry.service.TelemetryIngestionService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -17,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class MqttSubscriber implements SmartLifecycle {
@@ -24,14 +24,14 @@ public class MqttSubscriber implements SmartLifecycle {
     private static final Pattern TOPIC = Pattern.compile("^agrocontrol/v1/devices/([0-9a-fA-F-]{36})/telemetry$");
     private final MqttProperties properties;
     private final TelemetryIngestionService ingestion;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
     private MqttAsyncClient client;
     private volatile boolean running;
 
-    public MqttSubscriber(MqttProperties properties, TelemetryIngestionService ingestion, ObjectMapper objectMapper) {
+    public MqttSubscriber(MqttProperties properties, TelemetryIngestionService ingestion, JsonMapper jsonMapper) {
         this.properties = properties;
         this.ingestion = ingestion;
-        this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
     }
 
     @Override
@@ -73,7 +73,7 @@ public class MqttSubscriber implements SmartLifecycle {
             if (!matcher.matches()) throw new IllegalArgumentException("Unexpected MQTT topic.");
             var deviceId = UUID.fromString(matcher.group(1));
             var payload = new String(message.getPayload(), StandardCharsets.UTF_8);
-            var request = objectMapper.readValue(payload, TelemetryEventRequest.class);
+            var request = jsonMapper.readValue(payload, TelemetryEventRequest.class);
             ingestion.ingestFromDevice(deviceId, request, "mqtt");
         } catch (Exception ex) {
             log.warn("Rejected MQTT telemetry message on {}: {}", topic, ex.getMessage());

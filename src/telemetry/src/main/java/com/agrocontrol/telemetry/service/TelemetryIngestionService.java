@@ -5,26 +5,25 @@ import com.agrocontrol.telemetry.domain.DeviceStatus;
 import com.agrocontrol.telemetry.domain.TelemetryEventRecord;
 import com.agrocontrol.telemetry.repository.DeviceRepository;
 import com.agrocontrol.telemetry.repository.TelemetryEventRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class TelemetryIngestionService {
     private static final Pattern METRIC = Pattern.compile("[a-zA-Z0-9_.-]{1,80}");
     private final DeviceRepository devices;
     private final TelemetryEventRepository events;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
-    public TelemetryIngestionService(DeviceRepository devices, TelemetryEventRepository events, ObjectMapper objectMapper) {
+    public TelemetryIngestionService(DeviceRepository devices, TelemetryEventRepository events, JsonMapper jsonMapper) {
         this.devices = devices;
         this.events = events;
-        this.objectMapper = objectMapper;
+        this.jsonMapper = jsonMapper;
     }
 
     public IngestResult ingest(UUID organizationId, UUID deviceId, TelemetryEventRequest request, String transport) {
@@ -78,8 +77,8 @@ public class TelemetryIngestionService {
 
     private String serializeMetadata(Map<String, String> metadata) {
         if (metadata == null || metadata.isEmpty()) return null;
-        try { return objectMapper.writeValueAsString(metadata); }
-        catch (JsonProcessingException ex) { throw new IllegalArgumentException("metadata cannot be serialized.", ex); }
+        try { return jsonMapper.writeValueAsString(metadata); }
+        catch (Exception ex) { throw new IllegalArgumentException("metadata cannot be serialized.", ex); }
     }
 
     private static String normalize(String value) { return value == null || value.isBlank() ? null : value.trim(); }
