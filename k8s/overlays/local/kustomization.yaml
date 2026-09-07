@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+
+replicas:
+  - name: agrocontrol-api
+    count: 1
+  - name: agrocontrol-intelligence
+    count: 1
+  - name: agrocontrol-telemetry
+    count: 1
+
+images:
+  - name: ghcr.io/m4rc3low/agrocontrol-api
+    newName: agrocontrol-api
+    newTag: local
+  - name: ghcr.io/m4rc3low/agrocontrol-intelligence
+    newName: agrocontrol-intelligence
+    newTag: local
+  - name: ghcr.io/m4rc3low/agrocontrol-telemetry
+    newName: agrocontrol-telemetry
+    newTag: local
