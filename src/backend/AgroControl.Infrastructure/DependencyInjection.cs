@@ -1,5 +1,6 @@
 using AgroControl.Application.Common;
 using AgroControl.Application.Identity;
+using AgroControl.Application.Inventory;
 using AgroControl.Application.Production;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Infrastructure.Persistence;
@@ -21,15 +22,13 @@ public static class DependencyInjection
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
         services.AddScoped<IProductionRepository, ProductionRepository>();
+        services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
-
         return services;
     }
 
-    public static async Task ApplyDatabaseMigrationsAsync(
-        this IServiceProvider services,
-        CancellationToken cancellationToken = default)
+    public static async Task ApplyDatabaseMigrationsAsync(this IServiceProvider services, CancellationToken cancellationToken = default)
     {
         await using var scope = services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AgroControlDbContext>();
