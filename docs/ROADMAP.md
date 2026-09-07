@@ -121,7 +121,7 @@
 - [x] CI Java, PostgreSQL real e teste MQTT ponta a ponta;
 - [x] documentação de arquitetura e segurança.
 
-## Sprint 8 — Plataforma / DevOps 🔄
+## Sprint 8 — Plataforma / DevOps ✅
 
 - [x] OpenTelemetry na API C#, Intelligence Python e Telemetry Java;
 - [x] tracing HTTP distribuído e service names separados;
@@ -148,4 +148,8 @@
 - [x] ADR justificando por que Kubernetes passa a fazer sentido nesta fase;
 - [x] runbook e documentação operacional;
 - [x] SemVer definido para releases da plataforma;
-- [ ] validar todos os checks do pull request e integrar a Sprint 8 na `main`.
+- [x] PR #17 validado por Backend CI, Intelligence CI, Telemetry CI, Platform CI e CodeQL e integrado à `main`.
+
+## Próximos aprimoramentos
+
+O hardening operacional que depende de políticas, ambiente real ou testes de carga está registrado no issue #18. A próxima etapa funcional do produto deve ser planejada separadamente para não misturar evolução de negócio com hardening de plataforma.
