@@ -121,9 +121,31 @@
 - [x] CI Java, PostgreSQL real e teste MQTT ponta a ponta;
 - [x] documentação de arquitetura e segurança.
 
-## Sprint 8 — Plataforma / DevOps ⏭️
+## Sprint 8 — Plataforma / DevOps 🔄
 
-- [ ] pipelines completos e imagens versionadas;
-- [ ] ambientes e secrets management;
-- [ ] OpenTelemetry, métricas e Grafana;
-- [ ] Kubernetes quando o projeto justificar a orquestração.
+- [x] OpenTelemetry na API C#, Intelligence Python e Telemetry Java;
+- [x] tracing HTTP distribuído e service names separados;
+- [x] logs JSON na API principal;
+- [x] liveness e readiness explícitos;
+- [x] readiness da API validando PostgreSQL;
+- [x] métricas Prometheus do Telemetry e métricas OTLP da API;
+- [x] OpenTelemetry Collector, Tempo, Prometheus e Grafana;
+- [x] dashboard operacional inicial do AgroControl;
+- [x] profile `observability` opcional no Docker Compose;
+- [x] Platform CI com build e smoke test da stack integrada;
+- [x] validação automática de Docker Compose e Kustomize;
+- [x] cache de pacotes no Backend CI;
+- [x] Dependabot para NuGet, pip, Maven e GitHub Actions;
+- [x] CodeQL para C#, Java/Kotlin e Python;
+- [x] publicação de imagens no GHCR por SHA e SemVer;
+- [x] provenance e SBOM nas imagens publicadas;
+- [x] base Kubernetes com Deployments, Services, ConfigMap e probes;
+- [x] requests/limits e execução sem privilégios;
+- [x] PodDisruptionBudget para API e Intelligence;
+- [x] overlay local com Kustomize;
+- [x] secrets apenas por referência/template, sem credenciais reais no Git;
+- [x] PostgreSQL e MQTT de produção mantidos fora dos manifests simplificados;
+- [x] ADR justificando por que Kubernetes passa a fazer sentido nesta fase;
+- [x] runbook e documentação operacional;
+- [x] SemVer definido para releases da plataforma;
+- [ ] validar todos os checks do pull request e integrar a Sprint 8 na `main`.
