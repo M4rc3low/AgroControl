@@ -1,0 +1,35 @@
+server:
+  port: ${SERVER_PORT:8100}
+
+spring:
+  application:
+    name: AgroControl.Telemetry
+  datasource:
+    url: ${TELEMETRY_DB_URL:jdbc:postgresql://localhost:5433/agrocontrol_telemetry}
+    username: ${TELEMETRY_DB_USER:agrocontrol_telemetry}
+    password: ${TELEMETRY_DB_PASSWORD:agrocontrol_telemetry_dev}
+  sql:
+    init:
+      mode: always
+  jackson:
+    default-property-inclusion: non_null
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+telemetry:
+  internal-api-key: ${TELEMETRY_INTERNAL_API_KEY:development-only-telemetry-internal-key-change-me}
+  mqtt:
+    enabled: ${TELEMETRY_MQTT_ENABLED:true}
+    broker-url: ${TELEMETRY_MQTT_BROKER_URL:tcp://localhost:1883}
+    client-id: ${TELEMETRY_MQTT_CLIENT_ID:agrocontrol-telemetry}
+    topic-filter: ${TELEMETRY_MQTT_TOPIC:agrocontrol/v1/devices/+/telemetry}
+    qos: ${TELEMETRY_MQTT_QOS:1}
+    max-payload-bytes: ${TELEMETRY_MAX_PAYLOAD_BYTES:16384}

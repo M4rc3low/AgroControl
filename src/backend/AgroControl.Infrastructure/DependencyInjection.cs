@@ -7,9 +7,11 @@ using AgroControl.Application.Machinery;
 using AgroControl.Application.Market;
 using AgroControl.Application.Production;
 using AgroControl.Application.Subscriptions;
+using AgroControl.Application.Telemetry;
 using AgroControl.Infrastructure.Intelligence;
 using AgroControl.Infrastructure.Persistence;
 using AgroControl.Infrastructure.Security;
+using AgroControl.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,9 +22,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
-
+        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
         services.AddDbContext<AgroControlDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
@@ -36,18 +36,22 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 
         var intelligenceBaseUrl = configuration["Intelligence:BaseUrl"] ?? "http://localhost:8090";
-        var intelligenceTimeoutSeconds = int.TryParse(
-            configuration["Intelligence:TimeoutSeconds"],
-            out var configuredTimeout)
-            ? Math.Clamp(configuredTimeout, 1, 60)
-            : 5;
-
+        var intelligenceTimeout = int.TryParse(configuration["Intelligence:TimeoutSeconds"], out var configuredIntelligence) ? Math.Clamp(configuredIntelligence, 1, 60) : 5;
         services.AddHttpClient<IIntelligenceClient, IntelligenceHttpClient>(client =>
         {
             client.BaseAddress = new Uri(intelligenceBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(intelligenceTimeoutSeconds);
+            client.Timeout = TimeSpan.FromSeconds(intelligenceTimeout);
         });
 
+        var telemetryBaseUrl = configuration["Telemetry:BaseUrl"] ?? "http://localhost:8100";
+        var telemetryTimeout = int.TryParse(configuration["Telemetry:TimeoutSeconds"], out var configuredTelemetry) ? Math.Clamp(configuredTelemetry, 1, 60) : 5;
+        if ((configuration["Telemetry:InternalApiKey"] ?? string.Empty).Length < 32)
+            throw new InvalidOperationException("Telemetry:InternalApiKey must contain at least 32 characters.");
+        services.AddHttpClient<ITelemetryClient, TelemetryHttpClient>(client =>
+        {
+            client.BaseAddress = new Uri(telemetryBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(telemetryTimeout);
+        });
         return services;
     }
 
