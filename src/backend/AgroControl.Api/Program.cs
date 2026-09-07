@@ -4,6 +4,7 @@ using AgroControl.Api.Auth;
 using AgroControl.Api.Endpoints;
 using AgroControl.Application.Finance;
 using AgroControl.Application.Identity;
+using AgroControl.Application.Intelligence;
 using AgroControl.Application.Inventory;
 using AgroControl.Application.Machinery;
 using AgroControl.Application.Market;
@@ -31,6 +32,7 @@ builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<FinanceService>();
 builder.Services.AddScoped<MachineryService>();
 builder.Services.AddScoped<MarketService>();
+builder.Services.AddScoped<IntelligenceService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var jwtOptions = new JwtOptions
@@ -80,7 +82,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     service = "AgroControl.Api",
     status = "running",
-    version = "0.6.0"
+    version = "0.7.0"
 }));
 
 app.MapHealthChecks("/health");
@@ -195,6 +197,7 @@ app.MapInventoryEndpoints();
 app.MapFinanceEndpoints();
 app.MapMachineryEndpoints();
 app.MapMarketEndpoints();
+app.MapIntelligenceEndpoints();
 
 app.Run();
 
