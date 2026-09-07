@@ -39,3 +39,23 @@ jobs:
 
       - name: Pytest
         run: pytest -q
+
+      - name: Build Docker image
+        working-directory: .
+        run: docker build -f src/intelligence/Dockerfile -t agrocontrol-intelligence:test .
+
+      - name: Smoke test container health
+        working-directory: .
+        run: |
+          docker run -d --rm --name agrocontrol-intelligence-test -p 8090:8090 agrocontrol-intelligence:test
+          for attempt in {1..20}; do
+            if curl --fail --silent http://localhost:8090/health > /tmp/intelligence-health.json; then
+              cat /tmp/intelligence-health.json
+              docker stop agrocontrol-intelligence-test
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs agrocontrol-intelligence-test
+          docker stop agrocontrol-intelligence-test || true
+          exit 1
