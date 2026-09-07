@@ -63,17 +63,25 @@
 - [x] testes unitários e integração PostgreSQL;
 - [x] ponto de integração futura com consumo de estoque documentado.
 
-## Sprint 5 — Machinery + Market ⏭️
+## Sprint 5 — Machinery + Market ✅
 
-- [ ] máquinas e implementos;
-- [ ] horímetro e combustível;
-- [ ] manutenção preventiva e corretiva;
-- [ ] custos operacionais de máquinas;
-- [ ] preços de commodities;
-- [ ] histórico de preços;
-- [ ] alertas de mercado.
+- [x] máquinas e implementos;
+- [x] status operacional e vínculo opcional com propriedade;
+- [x] histórico de horímetro sem regressão;
+- [x] abastecimentos e custo de combustível;
+- [x] manutenção preventiva e corretiva;
+- [x] próxima manutenção por data e/ou horímetro;
+- [x] custos acumulados e custo por hora rastreada;
+- [x] commodities por organização;
+- [x] histórico append-only de cotações;
+- [x] última cotação e variação absoluta/percentual;
+- [x] alertas por preço-alvo;
+- [x] contrato para provedores externos de cotação;
+- [x] isolamento multi-tenant e bloqueio pelos módulos `Machinery` e `Market`;
+- [x] migration `MachineryMarketCore`;
+- [x] testes unitários e integração PostgreSQL.
 
-## Sprint 6 — AgroControl Intelligence
+## Sprint 6 — AgroControl Intelligence ⏭️
 
 - [ ] FastAPI;
 - [ ] contrato API↔Intelligence;
