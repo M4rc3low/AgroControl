@@ -70,6 +70,7 @@ spec:
             capabilities:
               drop: ["ALL"]
             runAsNonRoot: true
+            runAsUser: 10001
       terminationGracePeriodSeconds: 30
 ---
 apiVersion: v1
