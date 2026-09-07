@@ -1,8 +1,8 @@
 # AgroControl
 
-**AgroControl** é uma plataforma modular para gestão e inteligência no agronegócio. O projeto começa como um **monólito modular em C# / ASP.NET Core**, mantendo pontos claros de integração com serviços especializados em **Python** (dados, IA e visão computacional) e **Java** (telemetria e IoT).
+**AgroControl** é uma plataforma modular para gestão e inteligência no agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, com serviços especializados quando existe justificativa técnica — hoje, **Python / FastAPI** para inteligência de dados e, futuramente, **Java / Spring Boot** para telemetria e IoT.
 
-> Status atual: **Sprint 5 concluída — máquinas, manutenção e mercado de commodities**
+> Status atual: **Sprint 6 concluída — AgroControl Intelligence e previsão inicial de produtividade**
 
 ## Objetivo
 
@@ -30,7 +30,7 @@ Os módulos podem ser liberados por plano. Recursos indisponíveis continuam vis
 | API principal | C# + ASP.NET Core / .NET 10 |
 | Banco de dados | PostgreSQL |
 | ORM | Entity Framework Core |
-| Inteligência / Dados | Python + FastAPI (planejado) |
+| Inteligência / Dados | Python + FastAPI + scikit-learn |
 | Telemetria / IoT | Java + Spring Boot (planejado) |
 | Autenticação | JWT |
 | Containers | Docker / Docker Compose |
@@ -49,7 +49,7 @@ flowchart TB
     SENSORS[Sensores / GPS / Estações] --> TEL
 ```
 
-A API principal começa como um **monólito modular**. Python e Java só entram como serviços independentes quando houver uma justificativa técnica real.
+A API principal permanece como **monólito modular**. Python já entrou como serviço independente porque existe uma responsabilidade técnica clara de análise/modelagem. Java só entra quando a telemetria justificar essa separação.
 
 ## O que já funciona
 
@@ -119,11 +119,28 @@ A API principal começa como um **monólito modular**. Python e Java só entram 
 - contrato `IMarketQuoteProvider` para integrações externas futuras sem acoplar o domínio a um provedor;
 - isolamento multi-tenant e proteção pelo módulo `Market`.
 
+### AgroControl Intelligence
+
+- serviço Python independente com FastAPI;
+- contrato HTTP versionado `v1` entre a API C# e o serviço Python;
+- health check, OpenAPI e endpoint de informações do modelo;
+- dataset montado no backend com validação de `OrganizationId` antes de sair da API principal;
+- baseline por produtividade esperada ou média histórica;
+- regressão Ridge comparada ao baseline por avaliação leave-one-out;
+- métricas MAE e RMSE quando existe histórico suficiente;
+- retorno explícito de `insufficient_data` em vez de inventar previsões;
+- cliente HTTP tipado com timeout e tratamento de indisponibilidade;
+- proteção pelo módulo `Intelligence`;
+- Dockerfile e execução integrada via Docker Compose.
+
+A previsão é uma **estimativa de apoio à decisão**. Ela não substitui avaliação agronômica profissional e não deve ser interpretada como garantia de produtividade.
+
 ### Qualidade
 
-- testes unitários de domínio e segurança;
+- testes unitários de domínio, segurança e integração C# ↔ Intelligence;
 - testes de integração com PostgreSQL real;
-- CI provisionando PostgreSQL 17 e executando restore, build e test.
+- Backend CI provisionando PostgreSQL 17 e executando restore, build e test;
+- Intelligence CI executando Ruff e pytest no serviço Python.
 
 ## Módulos e planos
 
@@ -143,7 +160,7 @@ Tudo do Pro + Intelligence e Telemetry.
 
 Todos os módulos, incluindo Export.
 
-Documentação detalhada em [`docs/`](docs/), incluindo [`SPRINT_4_FINANCE.md`](docs/SPRINT_4_FINANCE.md) e [`SPRINT_5_MACHINERY_MARKET.md`](docs/SPRINT_5_MACHINERY_MARKET.md).
+Documentação detalhada em [`docs/`](docs/), incluindo [`SPRINT_5_MACHINERY_MARKET.md`](docs/SPRINT_5_MACHINERY_MARKET.md) e [`SPRINT_6_INTELLIGENCE.md`](docs/SPRINT_6_INTELLIGENCE.md).
 
 ## Executando com Docker
 
@@ -155,7 +172,13 @@ Documentação detalhada em [`docs/`](docs/), incluindo [`SPRINT_4_FINANCE.md`](
 docker compose up --build
 ```
 
-A API ficará em `http://localhost:8080`.
+Serviços padrão:
+
+```text
+AgroControl API          http://localhost:8080
+AgroControl Intelligence http://localhost:8090
+PostgreSQL               localhost:5432
+```
 
 ## Endpoints atuais
 
@@ -221,7 +244,21 @@ GET  /api/v1/platform/modules/{moduleKey}/access
 /api/v1/market/alerts
 ```
 
-Consulte [`docs/SPRINT_5_MACHINERY_MARKET.md`](docs/SPRINT_5_MACHINERY_MARKET.md) para contratos, regras e decisões da Sprint 5.
+### Intelligence — API principal
+
+```text
+POST /api/v1/intelligence/seasons/{seasonId}/yield-prediction
+```
+
+### Intelligence — serviço Python
+
+```text
+GET  /health
+GET  /api/v1/model
+POST /api/v1/yield/predict
+```
+
+Consulte [`docs/SPRINT_6_INTELLIGENCE.md`](docs/SPRINT_6_INTELLIGENCE.md) para o contrato, estratégia do modelo, tratamento de erros e limitações.
 
 ## Migrations
 
@@ -230,6 +267,8 @@ Consulte [`docs/SPRINT_5_MACHINERY_MARKET.md`](docs/SPRINT_5_MACHINERY_MARKET.md
 - `20260907134514_InventoryCore`
 - `20260907191652_FinanceCore`
 - `20260907195304_MachineryMarketCore`
+
+A Sprint 6 não cria tabelas novas: o serviço Intelligence consome, de forma isolada por tenant, os dados de produção já existentes.
 
 No Docker Compose, as migrations são aplicadas automaticamente porque `Database__ApplyMigrations=true`.
 
@@ -245,8 +284,8 @@ A chave de `appsettings.Development.json` é apenas uma chave conhecida de desen
 4. ✅ **Sprint 3** — estoque e movimentações de insumos.
 5. ✅ **Sprint 4** — financeiro e rentabilidade por safra.
 6. ✅ **Sprint 5** — máquinas, manutenção e mercado.
-7. ⏭️ **Sprint 6** — serviço Python de inteligência.
-8. **Sprint 7** — serviço Java de telemetria.
+7. ✅ **Sprint 6** — serviço Python de inteligência e previsão inicial.
+8. ⏭️ **Sprint 7** — serviço Java de telemetria.
 9. **Sprint 8** — observabilidade, CI/CD avançado e Kubernetes.
 
 Detalhes em [`docs/ROADMAP.md`](docs/ROADMAP.md).
