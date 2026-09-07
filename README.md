@@ -2,7 +2,7 @@
 
 **AgroControl** é uma plataforma modular para gestão, inteligência e tecnologia no agronegócio. O núcleo operacional permanece como um **monólito modular em C# / ASP.NET Core**, enquanto responsabilidades tecnicamente distintas são isoladas em serviços especializados: **Python / FastAPI** para inteligência de dados e **Java / Spring Boot** para telemetria e IoT.
 
-> Status atual: **Sprint 7 concluída — AgroControl Telemetry, MQTT e integração C# ↔ Java**
+> Status atual: **Sprint 8 em validação — observabilidade, CI/CD, segurança operacional e Kubernetes**
 
 ## Objetivo
 
@@ -30,12 +30,12 @@ Os módulos são liberados por plano e o bloqueio é validado no backend, não a
 | Telemetria / IoT | Java 21 + Spring Boot |
 | Banco de telemetria | PostgreSQL dedicado |
 | Mensageria IoT | MQTT + Eclipse Mosquitto |
-| Autenticação de usuário | JWT |
+| Autenticação | JWT |
 | Comunicação interna | HTTP tipado + credencial serviço-a-serviço |
 | Containers | Docker / Docker Compose |
-| CI/CD | GitHub Actions |
-| Observabilidade | OpenTelemetry + Grafana (Sprint 8) |
-| Orquestração | Kubernetes somente quando houver justificativa operacional |
+| Observabilidade | OpenTelemetry + Prometheus + Tempo + Grafana |
+| CI/CD | GitHub Actions + GHCR |
+| Orquestração | Kubernetes + Kustomize |
 
 ## Arquitetura
 
@@ -48,9 +48,18 @@ flowchart TB
     TEL --> TDB[(PostgreSQL Telemetry)]
     SENSORS[Sensores / GPS / Estações / Máquinas] --> MQTT[MQTT / Mosquitto]
     MQTT --> TEL
+
+    API -. OTLP .-> OTEL[OpenTelemetry Collector]
+    AI -. OTLP .-> OTEL
+    TEL -. OTLP .-> OTEL
+    OTEL --> TEMPO[Tempo]
+    OTEL --> PROM[Prometheus]
+    TEL -. métricas .-> PROM
+    PROM --> GRAFANA[Grafana]
+    TEMPO --> GRAFANA
 ```
 
-A API principal é responsável por identidade, assinatura, autorização, `OrganizationId` e regras centrais de negócio. O serviço Python possui a responsabilidade de análise/modelagem. O serviço Java possui a responsabilidade de ingestão, normalização e histórico de telemetria e **não escreve diretamente no schema do monólito**.
+A API principal é responsável por identidade, assinatura, autorização, `OrganizationId` e regras centrais de negócio. Python cuida de análise/modelagem. Java cuida de ingestão, normalização e histórico de telemetria e **não escreve diretamente no schema do monólito**.
 
 ## O que já funciona
 
@@ -88,27 +97,15 @@ A API principal é responsável por identidade, assinatura, autorização, `Orga
 - despesas, receitas, contas a pagar e receber;
 - competência, vencimento e liquidação;
 - vínculo com propriedade, talhão e safra;
-- receitas, despesas, resultado, margem e fluxo de caixa;
-- custo por hectare, custo por unidade produzida e ponto de equilíbrio.
+- resultado, margem, fluxo de caixa, custo/ha, custo por unidade e ponto de equilíbrio.
 
-### Máquinas e manutenção
+### Máquinas e mercado
 
-- máquinas e implementos;
-- status operacional;
-- histórico de horímetro sem regressão;
-- abastecimentos e custo de combustível;
-- manutenção preventiva e corretiva;
-- custos acumulados e custo por hora rastreada;
-- próxima manutenção por data e/ou horímetro.
-
-### Mercado e commodities
-
+- máquinas, implementos, status, horímetro, combustível e manutenção;
+- manutenção preventiva/corretiva e custos por máquina;
 - commodities por organização;
-- histórico append-only de cotações;
-- moeda, unidade, fonte e timestamp;
-- última cotação e variação absoluta/percentual;
-- alertas de preço acima/abaixo do alvo;
-- contrato preparado para provedores externos.
+- cotações append-only, variação e alertas por preço-alvo;
+- contrato preparado para provedores externos de cotação.
 
 ### AgroControl Intelligence
 
@@ -117,8 +114,8 @@ A API principal é responsável por identidade, assinatura, autorização, `Orga
 - baseline por produtividade esperada ou média histórica;
 - regressão Ridge comparada ao baseline;
 - MAE e RMSE quando há histórico suficiente;
-- `insufficient_data` quando não existe base confiável para estimativa;
-- dataset montado no C# e limitado à mesma organização e cultura;
+- `insufficient_data` quando não existe base confiável;
+- dataset limitado à organização e cultura corretas;
 - cliente HTTP tipado, timeout e tratamento de indisponibilidade;
 - Docker e CI próprio.
 
@@ -126,48 +123,42 @@ A previsão é **apoio à decisão** e não substitui avaliação agronômica pr
 
 ### AgroControl Telemetry
 
-- serviço Java 21 + Spring Boot independente;
-- banco PostgreSQL próprio;
-- cadastro de dispositivos por organização;
-- tipos iniciais para máquina, GPS, estação meteorológica e sensor de campo;
-- vínculos opcionais com máquina, propriedade e talhão;
-- eventos de telemetria append-only;
-- idempotência por `deviceId + eventId`;
+- Java 21 + Spring Boot com PostgreSQL próprio;
+- dispositivos por organização e vínculos opcionais com máquina, propriedade e talhão;
+- eventos append-only e idempotência por `deviceId + eventId`;
 - última leitura e histórico por período/métrica;
-- consumidor MQTT com QoS 1 e reconexão automática;
-- tópico versionado `agrocontrol/v1/devices/{deviceId}/telemetry`;
+- MQTT com QoS 1 e reconexão automática;
+- tópico `agrocontrol/v1/devices/{deviceId}/telemetry`;
 - validação de timestamp, valor, unidade, coordenadas, metadata e tamanho de payload;
-- API interna protegida por credencial serviço-a-serviço;
-- endpoints públicos do AgroControl protegidos por JWT + entitlement `Telemetry`;
-- tenant MQTT resolvido pelo dispositivo registrado, nunca confiando em um `OrganizationId` arbitrário no payload;
-- Docker Compose com Eclipse Mosquitto e PostgreSQL dedicado;
-- OpenAPI / Swagger UI no serviço Java.
+- API interna com credencial serviço-a-serviço;
+- endpoints do AgroControl protegidos por JWT + entitlement `Telemetry`;
+- tenant resolvido pelo dispositivo/usuário, nunca por `OrganizationId` arbitrário no payload.
 
-O broker Mosquitto do repositório é **somente para desenvolvimento**. Produção exige TLS, identidade por dispositivo/gateway, ACLs de tópico, rotação de credenciais, rate limiting e observabilidade apropriada. O AgroControl não implementa controle remoto de máquinas nesta fase.
+O Mosquitto do repositório é **somente para desenvolvimento**. Produção exige TLS, identidade por dispositivo/gateway, ACLs, rotação de credenciais, rate limiting e operação apropriada do broker.
 
-## Módulos e planos
+### Plataforma DevOps e observabilidade
 
-### Basic
+- OpenTelemetry na API C#, Intelligence Python e Telemetry Java;
+- propagação de traces nas chamadas HTTP instrumentadas;
+- logs JSON na API principal;
+- liveness e readiness separados;
+- readiness da API verifica PostgreSQL;
+- Spring Boot Actuator + Prometheus no Telemetry;
+- OpenTelemetry Collector, Tempo, Prometheus e Grafana em profile opcional;
+- dashboard operacional inicial provisionado automaticamente;
+- Platform CI sobe a stack completa e executa smoke tests;
+- Dependabot para NuGet, pip, Maven e GitHub Actions;
+- CodeQL para C#, Java/Kotlin e Python;
+- imagens Docker preparadas para publicação no GHCR por SHA/SemVer com provenance e SBOM;
+- manifests Kubernetes com Kustomize, probes, resources, security context e PDB;
+- PostgreSQL e MQTT de produção deliberadamente fora dos manifests simplificados.
 
-Identity, Organizations, Farms, Fields, Crops, Seasons, Inventory e Finance.
+## Executando localmente
 
-### Pro
-
-Tudo do Basic + Machinery, Market, Precision Agriculture, Irrigation e Sustainability.
-
-### Intelligence
-
-Tudo do Pro + Intelligence e Telemetry.
-
-### Enterprise
-
-Todos os módulos, incluindo Export.
-
-## Executando com Docker
-
-Copie `.env.example` para `.env`, substitua as chaves/credenciais de desenvolvimento e execute:
+Copie `.env.example` para `.env` e substitua os valores de desenvolvimento que desejar:
 
 ```bash
+cp .env.example .env
 docker compose up --build
 ```
 
@@ -180,6 +171,32 @@ AgroControl Telemetry    http://localhost:8100
 PostgreSQL Core          localhost:5432
 PostgreSQL Telemetry     localhost:5433
 MQTT / Mosquitto         localhost:1883
+```
+
+Para ligar a stack de observabilidade:
+
+```bash
+OTEL_ENABLED=true docker compose --profile observability up --build
+```
+
+```text
+Grafana                   http://localhost:3000
+Prometheus                http://localhost:9090
+Tempo                     http://localhost:3200
+OTLP gRPC                 localhost:4317
+OTLP HTTP                 localhost:4318
+```
+
+## Health checks
+
+```text
+API          GET /health/live
+API          GET /health/ready
+Intelligence GET /health/live
+Intelligence GET /health/ready
+Telemetry    GET /actuator/health/liveness
+Telemetry    GET /actuator/health/readiness
+Telemetry    GET /actuator/prometheus
 ```
 
 ## Endpoints principais
@@ -196,7 +213,7 @@ GET  /api/v1/organizations/current
 GET  /api/v1/platform/entitlements
 ```
 
-### Produção, estoque, financeiro, máquinas e mercado
+### Domínio operacional
 
 ```text
 /api/v1/farms
@@ -209,21 +226,15 @@ GET  /api/v1/platform/entitlements
 /api/v1/market/*
 ```
 
-### Intelligence — API principal
+### Intelligence
 
 ```text
 POST /api/v1/intelligence/seasons/{seasonId}/yield-prediction
+GET  /api/v1/model                         # serviço Python
+POST /api/v1/yield/predict                 # serviço Python
 ```
 
-### Intelligence — serviço Python
-
-```text
-GET  /health
-GET  /api/v1/model
-POST /api/v1/yield/predict
-```
-
-### Telemetry — API principal
+### Telemetry
 
 ```text
 GET   /api/v1/telemetry/devices
@@ -235,57 +246,41 @@ GET   /api/v1/telemetry/devices/{deviceId}/latest
 GET   /api/v1/telemetry/devices/{deviceId}/events
 ```
 
-### Telemetry — serviço Java interno
-
-```text
-GET /health
-/api/v1/organizations/{organizationId}/devices/*
-```
-
 Swagger UI do Telemetry:
 
 ```text
 http://localhost:8100/swagger-ui.html
 ```
 
-## MQTT
+## Kubernetes
 
-Tópico `v1`:
+Os manifests ficam em `k8s/`. A base pode ser renderizada sem aplicar nada:
 
-```text
-agrocontrol/v1/devices/{deviceId}/telemetry
+```bash
+kubectl kustomize k8s/base
+kubectl kustomize k8s/overlays/local
 ```
 
-Exemplo de evento:
+Consulte [`k8s/README.md`](k8s/README.md) antes de implantar. Segredos reais não entram no repositório, e os manifests não criam um PostgreSQL ou broker MQTT de produção ficticiamente "pronto".
 
-```json
-{
-  "eventId": "evt-001",
-  "capturedAtUtc": "2026-09-07T21:00:00Z",
-  "metric": "soil.moisture",
-  "numericValue": 42.5,
-  "unit": "%",
-  "latitude": -23.55,
-  "longitude": -46.63,
-  "quality": "good"
-}
-```
+## Qualidade e CI/CD
 
-## Qualidade e CI
-
-- Backend CI com PostgreSQL 17 real, restore, build e testes .NET;
-- Intelligence CI com Ruff, pytest, build de imagem e smoke test;
-- Telemetry CI com Java/Maven, PostgreSQL 17 real, idempotência, isolamento de tenant, build Docker e teste MQTT ponta a ponta;
-- contratos C# ↔ Python e C# ↔ Java testados no backend.
+- Backend CI: PostgreSQL 17, restore, build e testes .NET;
+- Intelligence CI: Ruff, pytest, imagem e smoke test;
+- Telemetry CI: Maven, PostgreSQL 17, imagem e MQTT ponta a ponta;
+- Platform CI: Docker Compose completo, observabilidade, Kustomize e smoke tests integrados;
+- CodeQL e Dependabot;
+- publicação GHCR preparada para `main` e tags `v*`.
 
 ## Documentação
 
 Consulte [`docs/`](docs/), especialmente:
 
-- [`SPRINT_5_MACHINERY_MARKET.md`](docs/SPRINT_5_MACHINERY_MARKET.md)
 - [`SPRINT_6_INTELLIGENCE.md`](docs/SPRINT_6_INTELLIGENCE.md)
 - [`SPRINT_7_TELEMETRY.md`](docs/SPRINT_7_TELEMETRY.md)
+- [`SPRINT_8_PLATFORM_DEVOPS.md`](docs/SPRINT_8_PLATFORM_DEVOPS.md)
 - [`ROADMAP.md`](docs/ROADMAP.md)
+- [`ADR-005`](docs/adr/ADR-005-observability-and-kubernetes.md)
 
 ## Migrations do banco principal
 
@@ -297,10 +292,6 @@ Consulte [`docs/`](docs/), especialmente:
 
 Intelligence não precisa de schema próprio. Telemetry possui banco separado e inicializa seu schema no serviço Java.
 
-## Segurança
-
-Os segredos presentes como defaults de desenvolvimento são apenas para execução local. Em produção, `JWT_KEY`, `TELEMETRY_INTERNAL_API_KEY`, credenciais de banco e credenciais/certificados MQTT devem ser fornecidos por mecanismos seguros de secrets management.
-
 ## Roadmap resumido
 
 1. ✅ **Sprint 0** — fundação, arquitetura, CI e containers.
@@ -311,7 +302,11 @@ Os segredos presentes como defaults de desenvolvimento são apenas para execuç�
 6. ✅ **Sprint 5** — máquinas e mercado.
 7. ✅ **Sprint 6** — Python / Intelligence.
 8. ✅ **Sprint 7** — Java / Telemetry / MQTT.
-9. ⏭️ **Sprint 8** — observabilidade, CI/CD avançado, ambientes e preparação de implantação.
+9. 🔄 **Sprint 8** — observabilidade, CI/CD, segurança operacional e Kubernetes; implementação pronta, em validação de PR.
+
+## Segurança
+
+Defaults presentes no repositório são apenas para desenvolvimento. Em produção, `JWT_KEY`, `TELEMETRY_INTERNAL_API_KEY`, credenciais de banco e credenciais/certificados MQTT devem ser fornecidos por um mecanismo apropriado de secrets management.
 
 ## Licença
 
