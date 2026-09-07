@@ -14,11 +14,15 @@ public partial class AgroControlDbContextModelSnapshot : ModelSnapshot
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
 #pragma warning disable 612, 618
-        modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
+        modelBuilder
+            .HasAnnotation("ProductVersion", "10.0.0")
+            .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+        NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
         modelBuilder.Entity("AgroControl.Domain.Modules.Organizations.Organization", b =>
         {
-            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
             b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
             b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("character varying(160)");
             b.Property<string>("Slug").IsRequired().HasMaxLength(180).HasColumnType("character varying(180)");
@@ -29,7 +33,7 @@ public partial class AgroControlDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("AgroControl.Domain.Modules.Identity.User", b =>
         {
-            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
             b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
             b.Property<string>("DisplayName").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
             b.Property<string>("Email").IsRequired().HasMaxLength(254).HasColumnType("character varying(254)");
@@ -53,7 +57,7 @@ public partial class AgroControlDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("AgroControl.Domain.Modules.Subscriptions.Subscription", b =>
         {
-            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
             b.Property<DateTime?>("EndsAtUtc").HasColumnType("timestamp with time zone");
             b.Property<Guid>("OrganizationId").HasColumnType("uuid");
             b.Property<PlanCode>("Plan").HasConversion(new EnumToStringConverter<PlanCode>()).HasMaxLength(32).HasColumnType("character varying(32)");
@@ -76,7 +80,7 @@ public partial class AgroControlDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("AgroControl.Domain.Modules.Farms.Farm", b =>
         {
-            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
             b.Property<string>("City").HasMaxLength(120).HasColumnType("character varying(120)");
             b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
             b.Property<bool>("IsActive").HasColumnType("boolean");
@@ -93,7 +97,7 @@ public partial class AgroControlDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("AgroControl.Domain.Modules.Fields.Field", b =>
         {
-            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
             b.Property<decimal>("AreaHectares").HasPrecision(18, 4).HasColumnType("numeric(18,4)");
             b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
             b.Property<Guid>("FarmId").HasColumnType("uuid");
@@ -110,7 +114,7 @@ public partial class AgroControlDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("AgroControl.Domain.Modules.Crops.Crop", b =>
         {
-            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
             b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
             b.Property<bool>("IsActive").HasColumnType("boolean");
             b.Property<string>("Name").IsRequired().HasMaxLength(120).HasColumnType("character varying(120)");
@@ -125,7 +129,7 @@ public partial class AgroControlDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("AgroControl.Domain.Modules.Seasons.Season", b =>
         {
-            b.Property<Guid>("Id").HasColumnType("uuid");
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
             b.Property<decimal?>("ActualYieldPerHectare").HasPrecision(18, 4).HasColumnType("numeric(18,4)");
             b.Property<Guid>("CropId").HasColumnType("uuid");
             b.Property<DateTime>("CreatedAtUtc").HasColumnType("timestamp with time zone");
