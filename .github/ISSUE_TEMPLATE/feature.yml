@@ -1,0 +1,26 @@
+name: Funcionalidade
+description: Planejar uma nova funcionalidade do AgroControl
+title: "feat: "
+labels: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema / necessidade
+      description: O que precisa ser resolvido?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Escopo
+      description: O que deve entrar nesta entrega?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Critérios de aceite
+      description: Como saberemos que está concluído?
+    validations:
+      required: true
