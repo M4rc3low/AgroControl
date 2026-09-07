@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgroControl.Api", "src\back
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgroControl.UnitTests", "tests\backend\AgroControl.UnitTests\AgroControl.UnitTests.csproj", "{5D706136-6B11-4981-8F0A-3D8553377D2B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgroControl.IntegrationTests", "tests\backend\AgroControl.IntegrationTests\AgroControl.IntegrationTests.csproj", "{732A0459-BB14-47B9-8A82-09A5C375CE8A}"
+EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution
         Debug|Any CPU = Debug|Any CPU
@@ -38,5 +40,9 @@ Global
         {5D706136-6B11-4981-8F0A-3D8553377D2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
         {5D706136-6B11-4981-8F0A-3D8553377D2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
         {5D706136-6B11-4981-8F0A-3D8553377D2B}.Release|Any CPU.Build.0 = Release|Any CPU
+        {732A0459-BB14-47B9-8A82-09A5C375CE8A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {732A0459-BB14-47B9-8A82-09A5C375CE8A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {732A0459-BB14-47B9-8A82-09A5C375CE8A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {732A0459-BB14-47B9-8A82-09A5C375CE8A}.Release|Any CPU.Build.0 = Release|Any CPU
     EndGlobalSection
 EndGlobal
