@@ -1,0 +1,55 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Visual Studio Code
+.vscode/
+
+# JetBrains
+.idea/
+*.sln.iml
+
+# Node
+node_modules/
+dist/
+coverage/
+.npm/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Java
+.gradle/
+target/
+*.class
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+secrets/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker/local data
+.pgdata/
+
+# Test output
+TestResults/

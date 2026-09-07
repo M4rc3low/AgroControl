@@ -1,0 +1,34 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "src/backend/**"
+      - "tests/backend/**"
+      - "AgroControl.sln"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "src/backend/**"
+      - "tests/backend/**"
+      - "AgroControl.sln"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore AgroControl.sln
+
+      - name: Build
+        run: dotnet build AgroControl.sln --configuration Release --no-restore
