@@ -9,12 +9,17 @@ on:
       - "src/backend/AgroControl.Infrastructure/Persistence/AgroControlDbContext.cs"
       - ".github/workflows/generate-inventory-migration.yml"
 
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: feat/sprint-3-inventory
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -34,9 +39,10 @@ jobs:
           --startup-project src/backend/AgroControl.Infrastructure/AgroControl.Infrastructure.csproj
           --output-dir Persistence/Migrations
 
-      - name: Upload generated migration
-        uses: actions/upload-artifact@v4
-        with:
-          name: inventory-migration
-          path: src/backend/AgroControl.Infrastructure/Persistence/Migrations
-          if-no-files-found: error
+      - name: Commit generated migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/backend/AgroControl.Infrastructure/Persistence/Migrations
+          git commit -m "db: add InventoryCore migration"
+          git push origin HEAD:feat/sprint-3-inventory
