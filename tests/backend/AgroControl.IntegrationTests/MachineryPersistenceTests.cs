@@ -45,6 +45,8 @@ public sealed class MachineryPersistenceTests
         Assert.Equal(1, totalA);
         Assert.Equal(1, totalB);
         Assert.Equal(machineA.Id, itemsA[0].Id);
+        Assert.True(await repository.InternalCodeExistsAsync(organizationA.Id, "TR-A", null));
+        Assert.False(await repository.InternalCodeExistsAsync(organizationB.Id, "TR-A", null));
         Assert.Equal(50m, totals.FuelLiters);
         Assert.Equal(300m, totals.FuelCost);
         Assert.Equal(150m, totals.MaintenanceCost);
