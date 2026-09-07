@@ -8,4 +8,7 @@
     <ProjectReference Include="..\AgroControl.Application\AgroControl.Application.csproj" />
     <ProjectReference Include="..\AgroControl.Infrastructure\AgroControl.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+  </ItemGroup>
 </Project>

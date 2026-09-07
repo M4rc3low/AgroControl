@@ -15,7 +15,7 @@ on:
       - ".github/workflows/backend-ci.yml"
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,3 +32,6 @@ jobs:
 
       - name: Build
         run: dotnet build AgroControl.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test AgroControl.sln --configuration Release --no-build --verbosity normal

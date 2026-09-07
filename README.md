@@ -1,8 +1,8 @@
 # AgroControl
 
-**AgroControl** é uma plataforma modular para gestão e inteligência no agronegócio. O projeto foi desenhado para começar como um **monólito modular em C# / ASP.NET Core**, mantendo pontos claros de integração com serviços especializados em **Python** (dados, IA e visão computacional) e **Java** (telemetria e IoT).
+**AgroControl** é uma plataforma modular para gestão e inteligência no agronegócio. O projeto começa como um **monólito modular em C# / ASP.NET Core**, mantendo pontos claros de integração com serviços especializados em **Python** (dados, IA e visão computacional) e **Java** (telemetria e IoT).
 
-> Status atual: **Sprint 0 — Fundação do projeto**
+> Status atual: **Sprint 1 concluída — Identity, Organizations e acesso por módulos**
 
 ## Objetivo
 
@@ -20,19 +20,19 @@ Centralizar, em uma única plataforma, os principais fluxos de uma operação ru
 - sustentabilidade e carbono;
 - exportação.
 
-Os módulos podem ser liberados por plano. Recursos indisponíveis continuam visíveis na interface como **bloqueados** ou **em breve**, mas o bloqueio também deve ser aplicado no backend.
+Os módulos podem ser liberados por plano. Recursos indisponíveis continuam visíveis na interface como **bloqueados** ou **em breve**, mas o bloqueio também é validado no backend.
 
-## Stack planejada
+## Stack
 
 | Camada | Tecnologia |
 |---|---|
-| Frontend | React + TypeScript |
-| API principal | C# + ASP.NET Core |
+| Frontend | React + TypeScript (planejado) |
+| API principal | C# + ASP.NET Core / .NET 10 |
 | Banco de dados | PostgreSQL |
 | ORM | Entity Framework Core |
-| Inteligência / Dados | Python + FastAPI |
-| Telemetria / IoT | Java + Spring Boot |
-| Autenticação | JWT / OpenID Connect |
+| Inteligência / Dados | Python + FastAPI (planejado) |
+| Telemetria / IoT | Java + Spring Boot (planejado) |
+| Autenticação | JWT |
 | Containers | Docker / Docker Compose |
 | Orquestração futura | Kubernetes |
 | CI/CD | GitHub Actions |
@@ -51,121 +51,97 @@ flowchart TB
 
 A API principal começa como um **monólito modular**. Python e Java só entram como serviços independentes quando houver uma justificativa técnica real.
 
-## Estrutura do repositório
+## O que já funciona
 
-```text
-agrocontrol/
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   ├── workflows/
-│   └── pull_request_template.md
-├── docs/
-│   ├── adr/
-│   ├── API_CONVENTIONS.md
-│   ├── ARCHITECTURE.md
-│   ├── DOMAIN.md
-│   ├── GITHUB_WORKFLOW.md
-│   ├── MODULES.md
-│   └── ROADMAP.md
-├── services/
-│   ├── intelligence/        # Python — fase futura
-│   └── telemetry/           # Java — fase futura
-├── src/
-│   ├── backend/
-│   │   ├── AgroControl.Api/
-│   │   ├── AgroControl.Application/
-│   │   ├── AgroControl.Domain/
-│   │   └── AgroControl.Infrastructure/
-│   └── frontend/            # React — fase futura
-├── tests/
-│   ├── backend/
-│   ├── intelligence/
-│   └── telemetry/
-├── .editorconfig
-├── .env.example
-├── .gitattributes
-├── .gitignore
-├── AgroControl.sln
-└── docker-compose.yml
-```
+- solução .NET 10 organizada em Domain, Application, Infrastructure e API;
+- PostgreSQL com Entity Framework Core;
+- migration inicial e factory de design-time;
+- Organization, User e membership usuário-organização;
+- papéis `Owner`, `Admin`, `Manager` e `Viewer`;
+- cadastro e login com JWT;
+- senha protegida com PBKDF2-HMAC-SHA512 e salt aleatório;
+- planos `Basic`, `Pro`, `Intelligence` e `Enterprise`;
+- entitlements e overrides por organização;
+- retorno `403 Forbidden` para módulo não habilitado;
+- Docker Compose com aplicação automática das migrations;
+- testes unitários;
+- CI com restore, build e test.
 
 ## Módulos
 
-### MVP
+### Basic
 
-- Identity
-- Organizations
-- Farms
-- Fields
-- Crops
-- Seasons
-- Inventory
-- Finance
+Identity, Organizations, Farms, Fields, Crops, Seasons, Inventory e Finance.
 
-### Em seguida
+### Pro
 
-- Machinery
-- Market
+Tudo do Basic + Machinery, Market, Precision Agriculture, Irrigation e Sustainability.
 
-### Planejados / bloqueados inicialmente
+### Intelligence
 
-- Precision Agriculture
-- Intelligence
-- Irrigation
-- Sustainability
-- Export
-- Telemetry / IoT
+Tudo do Pro + Intelligence e Telemetry.
 
-Veja [`docs/MODULES.md`](docs/MODULES.md) para o catálogo completo.
+### Enterprise
 
-## Convenções principais
+Todos os módulos, incluindo Export.
 
-- API versionada em `/api/v1/...`;
-- nomes internos do código em inglês;
-- documentação funcional pode permanecer em português;
-- `Guid` como identificador principal das entidades de negócio;
-- UTC para timestamps;
-- valores monetários com `decimal`;
-- módulos validados no backend, nunca apenas ocultados no frontend;
-- regras de negócio no domínio/aplicação, não nos controllers.
+Veja [`docs/MODULES.md`](docs/MODULES.md) e [`docs/SPRINT_1_IDENTITY.md`](docs/SPRINT_1_IDENTITY.md).
 
 ## Executando com Docker
 
-A estrutura já contém Docker Compose com PostgreSQL e a API.
-
 1. Copie `.env.example` para `.env`.
-2. Ajuste as variáveis se necessário.
+2. Troque `JWT_KEY` e, se desejar, as credenciais locais do PostgreSQL.
 3. Execute:
 
 ```bash
 docker compose up --build
 ```
 
-A API ficará disponível em:
+A API ficará em `http://localhost:8080`.
+
+### Endpoints iniciais
 
 ```text
-http://localhost:8080
+GET  /health
+GET  /api/v1/platform/modules
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+GET  /api/v1/me
+GET  /api/v1/organizations/current
+GET  /api/v1/platform/entitlements
+GET  /api/v1/platform/modules/{moduleKey}/access
 ```
 
-Health check:
+Exemplo de cadastro:
 
-```text
-GET http://localhost:8080/health
+```json
+{
+  "organizationName": "Fazenda Santa Clara",
+  "displayName": "Administrador",
+  "email": "admin@fazenda.local",
+  "password": "TroqueEstaSenha123!"
+}
 ```
 
-Catálogo inicial de módulos:
+O cadastro cria automaticamente a organização, o primeiro usuário como `Owner` e uma assinatura `Basic` ativa.
 
-```text
-GET http://localhost:8080/api/v1/platform/modules
-```
+## Migrations
 
-> O banco ainda não está conectado à aplicação na Sprint 0. Entity Framework Core entra no próximo sprint junto com as primeiras entidades persistidas.
+A migration inicial é `20260907002000_InitialIdentity`.
+
+Para usar o EF CLI localmente, configure opcionalmente `AGROCONTROL_CONNECTION_STRING` e execute o comando apontando para o projeto de Infrastructure. O `AgroControlDbContextFactory` permite criar o contexto em design-time sem depender da inicialização da API.
+
+No Docker Compose, as migrations são aplicadas automaticamente porque `Database__ApplyMigrations=true`.
+
+## Segurança
+
+A chave de `appsettings.Development.json` é apenas uma chave conhecida de desenvolvimento local. **Nunca use essa chave em produção.** Em ambientes reais, forneça `Jwt__Key` por secret/variável de ambiente segura.
 
 ## Roadmap resumido
 
-1. **Sprint 0** — fundação, documentação, arquitetura, CI e containers.
-2. **Sprint 1** — identidade, organizações e autorização por módulo.
-3. **Sprint 2** — propriedades, talhões, culturas e safras.
+1. ✅ **Sprint 0** — fundação, documentação, arquitetura, CI e containers.
+2. ✅ **Sprint 1** — identidade, organizações, PostgreSQL e autorização por módulo.
+3. ⏭️ **Sprint 2** — propriedades, talhões, culturas e safras.
 4. **Sprint 3** — estoque.
 5. **Sprint 4** — financeiro.
 6. **Sprint 5** — máquinas e mercado.
@@ -174,21 +150,6 @@ GET http://localhost:8080/api/v1/platform/modules
 9. **Sprint 8** — observabilidade, CI/CD avançado e Kubernetes.
 
 Detalhes em [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-## Estado da Sprint 0
-
-- [x] arquitetura definida;
-- [x] estrutura de pastas definida;
-- [x] solução .NET criada em formato de scaffold;
-- [x] endpoint de health check;
-- [x] catálogo inicial de módulos;
-- [x] Dockerfile da API;
-- [x] Docker Compose com PostgreSQL;
-- [x] documentação inicial;
-- [x] workflow inicial de CI;
-- [ ] primeiro domínio persistido com EF Core;
-- [ ] autenticação;
-- [ ] frontend.
 
 ## Licença
 

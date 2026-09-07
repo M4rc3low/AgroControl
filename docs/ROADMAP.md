@@ -1,6 +1,6 @@
 # Roadmap do AgroControl
 
-## Sprint 0 — Fundação
+## Sprint 0 — Fundação ✅
 
 Objetivo: deixar o projeto pronto para evolução controlada.
 
@@ -15,21 +15,27 @@ Objetivo: deixar o projeto pronto para evolução controlada.
 - [x] documentação inicial;
 - [x] CI inicial.
 
-## Sprint 1 — Identity + Organizations
+## Sprint 1 — Identity + Organizations ✅
 
-- [ ] configurar Entity Framework Core;
-- [ ] criar `AgroControlDbContext`;
-- [ ] configurar PostgreSQL;
-- [ ] migration inicial;
-- [ ] Organization;
-- [ ] User;
-- [ ] membership usuário-organização;
-- [ ] papéis e permissões;
-- [ ] autenticação;
-- [ ] entitlement de módulos;
-- [ ] auditoria básica.
+- [x] configurar Entity Framework Core;
+- [x] criar `AgroControlDbContext`;
+- [x] configurar PostgreSQL;
+- [x] migration inicial e model snapshot;
+- [x] design-time DbContext factory;
+- [x] Organization;
+- [x] User;
+- [x] membership usuário-organização;
+- [x] papéis iniciais;
+- [x] autenticação JWT;
+- [x] hash de senha com PBKDF2-HMAC-SHA512;
+- [x] planos Basic/Pro/Intelligence/Enterprise;
+- [x] entitlement de módulos;
+- [x] overrides de módulo por organização;
+- [x] bloqueio backend com `403 Forbidden`;
+- [x] auditoria temporal básica (`CreatedAtUtc` / `UpdatedAtUtc`);
+- [x] testes unitários e CI com `dotnet test`.
 
-## Sprint 2 — Produção Rural
+## Sprint 2 — Produção Rural ⏭️
 
 - [ ] Farm;
 - [ ] Field;
