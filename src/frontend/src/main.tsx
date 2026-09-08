@@ -5,6 +5,7 @@ import { App } from './App';
 import { AuthProvider } from './lib/auth';
 import { FarmScopeProvider } from './lib/farmScope';
 import './styles.css';
+import './components/AppShellMultiFarm.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
