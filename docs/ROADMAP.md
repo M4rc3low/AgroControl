@@ -195,6 +195,28 @@
 - [x] testes unitários e integração PostgreSQL;
 - [x] documentação da Sprint 14.
 
+## Sprint 15 — Importação geoespacial e zonas de manejo ✅
+
+- [x] módulo mantido sob o entitlement `PrecisionAgriculture`;
+- [x] entidade `ManagementZone` isolada por organização e talhão;
+- [x] tipos `Soil`, `Yield`, `Vegetation`, `Prescription` e `Custom`;
+- [x] geometria PostGIS WGS84 (`SRID 4326`) e índice espacial GiST;
+- [x] nome, descrição, classificação, valor numérico opcional e unidade;
+- [x] cálculo geodésico da área em hectares;
+- [x] validação WGS84, topológica e contenção no limite do talhão;
+- [x] tolerância técnica documentada de 0,5 m na contenção;
+- [x] importação de `GeoJSON Feature` e `FeatureCollection`;
+- [x] mapeamento seguro de propriedades GeoJSON para metadados;
+- [x] importação em lote transacional e limite de 250 features;
+- [x] exportação `FeatureCollection`;
+- [x] filtros por talhão, tipo e classificação;
+- [x] CRUD e desativação controlada de zonas;
+- [x] upload `.geojson/.json`, pré-visualização e camadas no MapLibre;
+- [x] alternância de visibilidade e exportação pela interface web;
+- [x] migration SQL `20260908134500_ManagementZonesCore` e estratégia espacial documentada;
+- [x] testes unitários, integração PostGIS e testes frontend;
+- [x] documentação `SPRINT_15_GEOSPATIAL_ZONES.md`.
+
 ## Próximos aprimoramentos
 
-O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para importação de geometrias, imagens de satélite/drone, índices vegetativos, zonas de manejo e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.
+O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para imagens de satélite/drone, índices vegetativos, processamento raster, importação KML/Shapefile e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.

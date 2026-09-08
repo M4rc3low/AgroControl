@@ -2,14 +2,14 @@
 
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 14 concluída — Comercial e CRM, clientes, contatos e pipeline de vendas**
+> Status atual: **Sprint 15 concluída — importação geoespacial, GeoJSON, PostGIS e zonas de manejo**
 
 ## Objetivo
 
 Centralizar os principais fluxos de uma operação rural em uma única plataforma:
 
 - propriedades, talhões, culturas e safras;
-- limites geográficos de talhões e mapas de agricultura de precisão;
+- limites geográficos de talhões, importação GeoJSON e zonas de manejo;
 - estoque e movimentações de insumos;
 - custos, receitas e rentabilidade;
 - máquinas, horímetro, combustível e manutenção;
@@ -78,7 +78,7 @@ A aplicação web mantém o navegador no mesmo origin para `/api`; a API concent
 - sidebar e topbar responsivos;
 - dashboard com propriedades, área, talhões, safras, estoque baixo e resumo financeiro;
 - CRUD web de propriedades, talhões, culturas e safras;
-- workspace de agricultura de precisão com mapa e limites de talhões;
+- workspace de agricultura de precisão com mapa, limites de talhões, upload GeoJSON e camadas de zonas de manejo;
 - painel de irrigação com zonas, condição hídrica, aplicações e volume estimado;
 - workspace de sustentabilidade com fatores de emissão, ledger de atividades, CO₂e e composição por categoria;
 - workspace de exportação com pedidos, câmbio, logística, custos, documentos e timeline operacional;
@@ -114,6 +114,12 @@ O frontend melhora a experiência, mas **não substitui as validações de autor
 - cálculo geodésico de área em hectares no PostgreSQL;
 - comparação entre área georreferenciada e área cadastral sem alteração silenciosa;
 - leitura, cadastro, redesenho e remoção de limites;
+- zonas de manejo `Soil`, `Yield`, `Vegetation`, `Prescription` e `Custom`;
+- importação de `Feature` e `FeatureCollection` GeoJSON com limite de 250 features;
+- validação de WGS84, topologia e contenção da zona no limite do talhão com tolerância técnica de 0,5 m;
+- importação em lote transacional e exportação `FeatureCollection`;
+- área geodésica por zona e metadados de classificação, valor e unidade;
+- camadas de zonas no MapLibre com pré-visualização, visibilidade e desativação controlada;
 - isolamento por organização e proteção pelo entitlement `PrecisionAgriculture`;
 - mapa MapLibre configurável por ambiente.
 
@@ -323,6 +329,7 @@ A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e 
 - [`docs/SPRINT_12_SUSTAINABILITY.md`](docs/SPRINT_12_SUSTAINABILITY.md)
 - [`docs/SPRINT_13_EXPORT.md`](docs/SPRINT_13_EXPORT.md)
 - [`docs/SPRINT_14_COMMERCIAL.md`](docs/SPRINT_14_COMMERCIAL.md)
+- [`docs/SPRINT_15_GEOSPATIAL_ZONES.md`](docs/SPRINT_15_GEOSPATIAL_ZONES.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## Roadmap resumido
@@ -342,6 +349,7 @@ A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e 
 13. ✅ **Sprint 12** — sustentabilidade, fatores de emissão, CO₂e e indicadores ambientais.
 14. ✅ **Sprint 13** — exportação, câmbio, documentos, logística e custos internacionais.
 15. ✅ **Sprint 14** — comercial e CRM, clientes, contatos, oportunidades e pipeline de vendas.
+16. ✅ **Sprint 15** — importação GeoJSON, PostGIS e zonas de manejo.
 
 O hardening que depende de ambiente real, política operacional ou testes de carga está separado no issue **#18**.
 
