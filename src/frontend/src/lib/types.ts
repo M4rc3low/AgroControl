@@ -62,6 +62,22 @@ export interface VegetationIndexObservation { id: string; sceneId: string; field
 export interface RemoteSensingSeriesPoint { observationId: string; sceneId: string; managementZoneId: string | null; indexType: string; customIndexName: string | null; mean: number; minimum: number; maximum: number; median: number; standardDeviation: number; validCoveragePercent: number; sampleCount: number | null; source: string; platform: string; observedAtUtc: string; }
 export interface RemoteSensingLatestMetric { indexType: string; customIndexName: string | null; mean: number; minimum: number; maximum: number; validCoveragePercent: number; source: string; platform: string; observedAtUtc: string; sceneId: string; managementZoneId: string | null; }
 export interface RemoteSensingSummary { fieldId: string; seasonId: string | null; managementZoneId: string | null; sceneCount: number; latestMetrics: RemoteSensingLatestMetric[]; }
+export interface RemoteSceneDiscoveryProvider { key: string; displayName: string; isEnabled: boolean; collections: string[]; }
+export interface RemoteSceneDiscoveryAsset { key: string; href: string; mediaType: string | null; roles: string[]; isRasterCandidate: boolean; }
+export interface RemoteSceneDiscoveryItem {
+  provider: string;
+  collection: string;
+  externalId: string;
+  acquiredAtUtc: string;
+  geometryGeoJson: string | null;
+  bbox: number[] | null;
+  cloudCoveragePercent: number | null;
+  spatialResolutionMeters: number | null;
+  platform: string | null;
+  constellation: string | null;
+  assets: RemoteSceneDiscoveryAsset[];
+}
+export interface RemoteSceneDiscoveryPage { items: RemoteSceneDiscoveryItem[]; continuationToken: string | null; }
 export interface RasterProcessingRun { id: string; productId: string; sceneId: string; processingKey: string; status: 'Pending' | 'Processing' | 'Succeeded' | 'Failed' | string; includeManagementZones: boolean; requestedAtUtc: string; startedAtUtc: string | null; completedAtUtc: string | null; failureMessage: string | null; productType: string; customProductName: string | null; assetReference: string; band: number; crs: string | null; resolutionX: number | null; resolutionY: number | null; nodata: number | null; width: number | null; height: number | null; }
 export interface RasterZonalResult { id: string; runId: string; productId: string; observationId: string; sceneId: string; fieldId: string; seasonId: string | null; managementZoneId: string | null; indexType: string; customIndexName: string | null; minimum: number; maximum: number; mean: number; median: number; standardDeviation: number; validCoveragePercent: number; sampleCount: number; source: string; observedAtUtc: string; createdAtUtc: string; }
 export interface RasterProcessingResponse { run: RasterProcessingRun; reused: boolean; results: RasterZonalResult[]; }
