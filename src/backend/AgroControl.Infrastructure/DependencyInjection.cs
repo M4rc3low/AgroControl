@@ -29,6 +29,8 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
+        services.AddScoped<OperationalScopeContext>();
+        services.AddScoped<IOperationalScopeContext>(provider => provider.GetRequiredService<OperationalScopeContext>());
         services.AddDbContext<AgroControlDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();

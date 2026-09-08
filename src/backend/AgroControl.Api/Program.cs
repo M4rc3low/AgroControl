@@ -105,6 +105,20 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 app.UseExceptionHandler();
 app.UseAuthentication();
+app.Use(async (httpContext, next) =>
+{
+    if (httpContext.User.Identity?.IsAuthenticated == true &&
+        TryGetOrganizationId(httpContext.User, out var organizationId) &&
+        TryGetUserId(httpContext.User, out var userId))
+    {
+        var currentScope = httpContext.RequestServices.GetRequiredService<OperationalScopeContext>();
+        var accessScope = httpContext.RequestServices.GetRequiredService<IFarmAccessScope>();
+        var snapshot = await accessScope.GetEffectiveScopeAsync(organizationId, userId, httpContext.RequestAborted);
+        currentScope.Initialize(organizationId, userId, snapshot);
+    }
+
+    await next();
+});
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
@@ -175,3 +189,4 @@ app.MapCommercialEndpoints();
 app.Run();
 
 static bool TryGetOrganizationId(ClaimsPrincipal principal, out Guid organizationId) => Guid.TryParse(principal.FindFirstValue("org_id"), out organizationId);
+static bool TryGetUserId(ClaimsPrincipal principal, out Guid userId) => Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out userId);
