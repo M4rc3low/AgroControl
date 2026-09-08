@@ -2,20 +2,21 @@
 
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 9 — AgroControl Web implementado e integrado à plataforma técnica**
+> Status atual: **Sprint 10 concluída — Agricultura de Precisão com PostGIS e talhões georreferenciados**
 
 ## Objetivo
 
 Centralizar os principais fluxos de uma operação rural em uma única plataforma:
 
 - propriedades, talhões, culturas e safras;
+- limites geográficos de talhões e mapas de agricultura de precisão;
 - estoque e movimentações de insumos;
 - custos, receitas e rentabilidade;
 - máquinas, horímetro, combustível e manutenção;
 - commodities e alertas de mercado;
 - análise de dados e previsão de produtividade;
 - sensores, GPS, estações e telemetria;
-- módulos futuros de agricultura de precisão, irrigação, sustentabilidade e exportação.
+- módulos futuros de irrigação, sustentabilidade e exportação.
 
 Os módulos são liberados por plano e o bloqueio é validado no backend, não apenas na interface.
 
@@ -25,11 +26,12 @@ Os módulos são liberados por plano e o bloqueio é validado no backend, não a
 |---|---|
 | Web | React 19 + TypeScript 7 + Vite 8 |
 | API principal | C# + ASP.NET Core / .NET 10 |
-| Banco principal | PostgreSQL + Entity Framework Core |
+| Banco principal | PostgreSQL 17 + PostGIS + Entity Framework Core |
 | Inteligência | Python 3.12 + FastAPI + scikit-learn |
 | Telemetria / IoT | Java 21 + Spring Boot |
 | Banco de telemetria | PostgreSQL dedicado |
 | Mensageria IoT | MQTT + Eclipse Mosquitto |
+| Mapas | MapLibre GL + GeoJSON |
 | Autenticação | JWT |
 | Containers | Docker / Docker Compose |
 | Observabilidade | OpenTelemetry + Prometheus + Tempo + Grafana |
@@ -42,7 +44,7 @@ Os módulos são liberados por plano e o bloqueio é validado no backend, não a
 flowchart TB
     BROWSER[Navegador] --> WEB[AgroControl Web\nReact + TypeScript + Nginx]
     WEB --> API[AgroControl API\nC# / ASP.NET Core]
-    API --> DB[(PostgreSQL Core)]
+    API --> DB[(PostgreSQL + PostGIS Core)]
     API --> AI[AgroControl Intelligence\nPython / FastAPI]
     API --> TEL[AgroControl Telemetry\nJava / Spring Boot]
     TEL --> TDB[(PostgreSQL Telemetry)]
@@ -70,10 +72,9 @@ A aplicação web mantém o navegador no mesmo origin para `/api`; a API concent
 - rotas privadas;
 - contexto de organização, papel, plano e entitlements;
 - sidebar e topbar responsivos;
-- catálogo visual de módulos e estados bloqueados;
 - dashboard com propriedades, área, talhões, safras, estoque baixo e resumo financeiro;
 - CRUD web de propriedades, talhões, culturas e safras;
-- formulários, filtros, estados de loading/erro/vazio e desativação;
+- workspace de agricultura de precisão com mapa e limites de talhões;
 - layout para desktop, tablet e mobile;
 - proxy reverso same-origin no Nginx.
 
@@ -95,6 +96,18 @@ O frontend melhora a experiência, mas **não substitui as validações de autor
 - CRUD, soft delete, paginação, busca e filtros;
 - validações de área, datas e produtividade;
 - produtividade esperada e realizada por hectare.
+
+### Agricultura de precisão
+
+- PostGIS no banco principal;
+- limite opcional do talhão como `geography(Polygon,4326)`;
+- contrato GeoJSON e validação WGS84;
+- índice espacial GiST;
+- cálculo geodésico de área em hectares no PostgreSQL;
+- comparação entre área georreferenciada e área cadastral sem alteração silenciosa;
+- leitura, cadastro, redesenho e remoção de limites;
+- isolamento por organização e proteção pelo entitlement `PrecisionAgriculture`;
+- mapa MapLibre configurável por ambiente.
 
 ### Estoque
 
@@ -143,22 +156,16 @@ A previsão é **apoio à decisão** e não substitui avaliação agronômica pr
 - API interna com credencial serviço-a-serviço;
 - endpoints externos protegidos por JWT + entitlement `Telemetry`.
 
-O Mosquitto do repositório é **somente para desenvolvimento**. Produção exige TLS, identidade por dispositivo/gateway, ACLs, rotação de credenciais e operação apropriada do broker.
-
 ### DevOps e observabilidade
 
 - OpenTelemetry na API C#, Intelligence Python e Telemetry Java;
-- traces distribuídos nas chamadas HTTP instrumentadas;
-- logs JSON na API principal;
-- liveness e readiness separados;
+- traces distribuídos, logs JSON, liveness/readiness;
 - OpenTelemetry Collector, Tempo, Prometheus e Grafana em profile opcional;
-- dashboard operacional provisionado automaticamente;
 - pipelines independentes para backend, Intelligence, Telemetry, frontend e plataforma integrada;
 - Dependabot para NuGet, pip, Maven, npm e GitHub Actions;
 - CodeQL para C#, Java/Kotlin, Python e JavaScript/TypeScript;
 - publicação das quatro imagens no GHCR por SHA/SemVer com provenance e SBOM;
-- Kubernetes com Kustomize, probes, resources, security context e PDB;
-- PostgreSQL e MQTT de produção deliberadamente fora dos manifests simplificados.
+- Kubernetes com Kustomize, probes, resources, security context e PDB.
 
 ## Executando localmente
 
@@ -174,7 +181,7 @@ AgroControl Web          http://localhost:3001
 AgroControl API          http://localhost:8080
 AgroControl Intelligence http://localhost:8090
 AgroControl Telemetry    http://localhost:8100
-PostgreSQL Core          localhost:5432
+PostgreSQL + PostGIS     localhost:5432
 PostgreSQL Telemetry     localhost:5433
 MQTT / Mosquitto         localhost:1883
 ```
@@ -183,14 +190,6 @@ Para ativar observabilidade:
 
 ```bash
 OTEL_ENABLED=true docker compose --profile observability up --build
-```
-
-```text
-Grafana                   http://localhost:3000
-Prometheus                http://localhost:9090
-Tempo                     http://localhost:3200
-OTLP gRPC                 localhost:4317
-OTLP HTTP                 localhost:4318
 ```
 
 ## Health checks
@@ -219,33 +218,26 @@ GET  /api/v1/platform/entitlements
 /api/v1/fields
 /api/v1/crops
 /api/v1/seasons
+/api/v1/precision/*
 /api/v1/inventory/*
 /api/v1/finance/*
 /api/v1/machinery/*
 /api/v1/market/*
-
 POST /api/v1/intelligence/seasons/{seasonId}/yield-prediction
 /api/v1/telemetry/*
 ```
 
 ## Kubernetes
 
-A base fica em `k8s/` e pode ser renderizada sem aplicar recursos:
-
-```bash
-kubectl kustomize k8s/base
-kubectl kustomize k8s/overlays/local
-```
-
-A web possui Deployment/Service próprios e aponta para `agrocontrol-api:8080`. Segredos reais não entram no repositório.
+A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e `kubectl kustomize k8s/overlays/local`. Segredos reais não entram no repositório.
 
 ## Qualidade e CI/CD
 
-- **Backend CI:** PostgreSQL 17, restore, build e testes .NET;
+- **Backend CI:** PostgreSQL 17 + PostGIS, restore, build e testes .NET;
 - **Intelligence CI:** Ruff, pytest, imagem e smoke test;
 - **Telemetry CI:** Maven, PostgreSQL 17, imagem e MQTT ponta a ponta;
 - **Frontend CI:** `npm ci`, type-check, Vitest, build, imagem e smoke test;
-- **Platform CI:** Docker Compose completo, web, observabilidade, Kustomize e smoke tests integrados;
+- **Platform CI:** Docker Compose completo, web, PostGIS, observabilidade, Kustomize e smoke tests integrados;
 - **CodeQL:** C#, Java/Kotlin, Python e JavaScript/TypeScript;
 - **Dependabot:** NuGet, pip, Maven, npm e GitHub Actions.
 
@@ -255,6 +247,7 @@ A web possui Deployment/Service próprios e aponta para `agrocontrol-api:8080`. 
 - [`docs/SPRINT_7_TELEMETRY.md`](docs/SPRINT_7_TELEMETRY.md)
 - [`docs/SPRINT_8_PLATFORM_DEVOPS.md`](docs/SPRINT_8_PLATFORM_DEVOPS.md)
 - [`docs/SPRINT_9_WEB.md`](docs/SPRINT_9_WEB.md)
+- [`docs/SPRINT_10_PRECISION_AGRICULTURE.md`](docs/SPRINT_10_PRECISION_AGRICULTURE.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## Roadmap resumido
@@ -268,13 +261,16 @@ A web possui Deployment/Service próprios e aponta para `agrocontrol-api:8080`. 
 7. ✅ **Sprint 6** — Python / Intelligence.
 8. ✅ **Sprint 7** — Java / Telemetry / MQTT.
 9. ✅ **Sprint 8** — observabilidade, CI/CD, segurança operacional e Kubernetes.
-10. 🚀 **Sprint 9** — AgroControl Web, autenticação, dashboard e produção rural no navegador.
+10. ✅ **Sprint 9** — AgroControl Web, autenticação, dashboard e produção rural no navegador.
+11. ✅ **Sprint 10** — PostGIS, GeoJSON, talhões georreferenciados e mapas.
 
 O hardening que depende de ambiente real, política operacional ou testes de carga está separado no issue **#18**.
 
 ## Segurança
 
 Defaults do repositório são apenas de desenvolvimento. Em produção, `JWT_KEY`, `TELEMETRY_INTERNAL_API_KEY`, credenciais de banco e credenciais/certificados MQTT devem vir de secrets management apropriado.
+
+O mapa usa URLs configuráveis e não exige segredo no frontend. Caso um provedor de tiles exija credenciais, elas não devem ser tratadas como segredo confiável quando expostas ao navegador; aplique restrições por domínio/quota ou um backend apropriado conforme o provedor.
 
 O JWT do frontend usa `sessionStorage` por compatibilidade com o contrato bearer atual. A evolução para BFF/cookie HttpOnly pode ser adotada quando a exposição pública e o modelo de sessão justificarem esse endurecimento.
 

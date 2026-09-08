@@ -89,7 +89,7 @@
 - [x] Kubernetes + Kustomize, probes, resources, security context e PDB;
 - [x] runbook, ADR e documentação operacional.
 
-## Sprint 9 — AgroControl Web 🚀
+## Sprint 9 — AgroControl Web ✅
 
 - [x] React 19 + TypeScript 7 + Vite 8;
 - [x] React Router e rotas protegidas;
@@ -99,17 +99,28 @@
 - [x] app shell e design system responsivos;
 - [x] dashboard com dados reais de produção, estoque e financeiro;
 - [x] CRUD web de Farm, Field, Crop e Season;
-- [x] páginas de entrada e estados bloqueados dos demais módulos;
 - [x] `package-lock.json` e `npm ci` para builds reproduzíveis;
-- [x] Frontend CI com type-check, testes, build, imagem e smoke test;
-- [x] CodeQL para JavaScript/TypeScript e Dependabot npm;
-- [x] Nginx unprivileged e proxy same-origin para a API;
-- [x] Docker Compose com serviço web;
-- [x] Platform CI validando web e proxy `/api`;
-- [x] imagem `agrocontrol-web` incluída no pipeline GHCR;
-- [x] Kubernetes com Deployment, Service, probes, resources e PDB para web;
+- [x] Frontend CI, CodeQL JS/TS e Dependabot npm;
+- [x] Nginx unprivileged, Docker Compose, GHCR e Kubernetes para a web;
 - [x] documentação da Sprint 9.
+
+## Sprint 10 — Agricultura de Precisão ✅
+
+- [x] PostGIS no banco principal de desenvolvimento e CI;
+- [x] `geography(Polygon,4326)` para limites de talhões;
+- [x] índice espacial GiST;
+- [x] contrato GeoJSON e validação WGS84;
+- [x] validação topológica com PostGIS;
+- [x] área geodésica em hectares;
+- [x] diferença entre área espacial e cadastral sem alteração automática;
+- [x] endpoints protegidos por `PrecisionAgriculture`;
+- [x] isolamento multi-tenant;
+- [x] mapa MapLibre no AgroControl Web;
+- [x] desenho, redesenho e remoção de limites;
+- [x] configuração de assets/style de mapa por ambiente;
+- [x] testes unitários frontend/backend e integração PostGIS;
+- [x] documentação da fundação espacial.
 
 ## Próximos aprimoramentos
 
-O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. Evoluções de produto podem aprofundar Estoque/Financeiro/Machinery/Market/Intelligence/Telemetry no frontend, adicionar agricultura de precisão e, quando houver justificativa real, avançar para PWA/offline ou aplicações móveis.
+O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para irrigação/clima, sustentabilidade, importação de geometrias, imagens de satélite/drone, índices vegetativos e zonas de manejo, mantendo cada responsabilidade em uma sprint separada.
