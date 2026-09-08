@@ -27,10 +27,14 @@ public sealed class RasterProcessingService(
         if (customName?.Length > 120) return RasterProcessResult.Validation("Custom product name cannot exceed 120 characters.");
         if (command.Band is < 1 or > 128) return RasterProcessResult.Validation("Raster band must be between 1 and 128.");
 
-        var assetReference = Clean(command.AssetReference) ?? scene.AssetReference;
+        var assetReference = Clean(scene.AssetReference);
         if (string.IsNullOrWhiteSpace(assetReference))
-            return RasterProcessResult.Validation("The scene does not have a raster asset reference and none was supplied for processing.");
+            return RasterProcessResult.Validation("The scene must reference a raster asset before processing.");
         if (assetReference.Length > 2048) return RasterProcessResult.Validation("Raster asset reference cannot exceed 2048 characters.");
+
+        var requestedAsset = Clean(command.AssetReference);
+        if (requestedAsset is not null && !string.Equals(requestedAsset, assetReference, StringComparison.Ordinal))
+            return RasterProcessResult.Validation("Raster processing is limited to the asset explicitly referenced by the selected scene.");
 
         var field = await precisionRepository.GetFieldAsync(organizationId, scene.FieldId, cancellationToken);
         if (field is null || !field.IsActive) return RasterProcessResult.NotFound("Scene field was not found or is inactive.");
@@ -49,9 +53,11 @@ public sealed class RasterProcessingService(
             targetZones[key] = zone.Id;
         }
 
-        var processingKey = NormalizeProcessingKey(command.ProcessingKey) ?? ComputeProcessingKey(scene.Id, productType,
-            customName, assetReference, command.Band, command.IncludeManagementZones);
-        if (processingKey.Length > 160) return RasterProcessResult.Validation("Processing key cannot exceed 160 characters.");
+        var clientProcessingKey = NormalizeProcessingKey(command.ProcessingKey);
+        if (clientProcessingKey?.Length > 160)
+            return RasterProcessResult.Validation("Processing key cannot exceed 160 characters.");
+        var processingKey = ComputeProcessingKey(scene.Id, productType, customName, assetReference, command.Band,
+            command.IncludeManagementZones, clientProcessingKey, targets);
 
         var now = DateTime.UtcNow;
         var product = new RasterProductWriteModel(Guid.NewGuid(), scene.Id, productType.ToString(), customName,
@@ -160,9 +166,12 @@ public sealed class RasterProcessingService(
         TryParseProductType(value, out var type) ? type.ToString() : null;
 
     private static string ComputeProcessingKey(Guid sceneId, RasterProductType type, string? customName,
-        string assetReference, int band, bool includeZones)
+        string assetReference, int band, bool includeZones, string? clientKey, IReadOnlyList<RasterTargetData> targets)
     {
-        var material = $"v1|{sceneId:D}|{type}|{customName}|{assetReference}|{band}|{includeZones}";
+        var spatialContext = string.Join('|', targets
+            .OrderBy(target => target.Key, StringComparer.Ordinal)
+            .Select(target => $"{target.Key}:{target.GeometryGeoJson}"));
+        var material = $"v2|{sceneId:D}|{type}|{customName}|{assetReference}|{band}|{includeZones}|{clientKey}|{spatialContext}";
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material))).ToLowerInvariant();
     }
 
