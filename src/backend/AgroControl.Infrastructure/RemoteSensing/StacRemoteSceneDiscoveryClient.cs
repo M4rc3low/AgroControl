@@ -83,6 +83,70 @@ public sealed class StacRemoteSceneDiscoveryClient : IRemoteSceneDiscoveryClient
         }
     }
 
+    public async Task<RemoteSceneDiscoveryItemCallResult> GetItemAsync(
+        string provider,
+        string collection,
+        string externalId,
+        CancellationToken cancellationToken = default)
+    {
+        provider = provider?.Trim() ?? string.Empty;
+        collection = collection?.Trim() ?? string.Empty;
+        externalId = externalId?.Trim() ?? string.Empty;
+
+        if (provider.Length == 0 || collection.Length == 0 || externalId.Length == 0)
+            return RemoteSceneDiscoveryItemCallResult.Validation("Provider, collection and external id are required.");
+        if (collection.Length > 200 || externalId.Length > 300)
+            return RemoteSceneDiscoveryItemCallResult.Validation("Collection or external id is too long.");
+
+        if (!_providers.TryGetValue(provider, out var configuration) || !configuration.Enabled)
+            return RemoteSceneDiscoveryItemCallResult.Validation("STAC provider is not configured or enabled.");
+        if (configuration.Collections.Count > 0 &&
+            !configuration.Collections.Contains(collection, StringComparer.OrdinalIgnoreCase))
+            return RemoteSceneDiscoveryItemCallResult.Validation("Requested STAC collection is not allowed for this provider.");
+        if (!TryValidateProviderUri(configuration.BaseUrl, out var baseUri))
+            return RemoteSceneDiscoveryItemCallResult.Unavailable("STAC provider configuration is invalid.");
+
+        var relative = $"collections/{Uri.EscapeDataString(collection)}/items/{Uri.EscapeDataString(externalId)}";
+        var itemUri = new Uri(EnsureTrailingSlash(baseUri), relative);
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient("stac-discovery");
+            using var response = await client.GetAsync(itemUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                return RemoteSceneDiscoveryItemCallResult.NotFound("STAC item was not found.");
+            if (response.StatusCode == HttpStatusCode.BadRequest || response.StatusCode == HttpStatusCode.UnprocessableEntity)
+                return RemoteSceneDiscoveryItemCallResult.Validation("STAC provider rejected the item request.");
+            if (!response.IsSuccessStatusCode)
+                return RemoteSceneDiscoveryItemCallResult.Unavailable($"STAC provider returned HTTP {(int)response.StatusCode}.");
+
+            await using var payload = await ReadLimitedPayloadAsync(response, cancellationToken);
+            if (payload is null)
+                return RemoteSceneDiscoveryItemCallResult.InvalidPayload("STAC item response exceeded the allowed payload size.");
+
+            using var document = await JsonDocument.ParseAsync(payload, cancellationToken: cancellationToken);
+            var item = ParseItem(document.RootElement, configuration);
+            if (item is null || !item.Collection.Equals(collection, StringComparison.OrdinalIgnoreCase) ||
+                !item.ExternalId.Equals(externalId, StringComparison.Ordinal))
+                return RemoteSceneDiscoveryItemCallResult.InvalidPayload("STAC provider returned an unexpected item payload.");
+
+            return RemoteSceneDiscoveryItemCallResult.Success(item);
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return RemoteSceneDiscoveryItemCallResult.Timeout("STAC provider timed out.");
+        }
+        catch (HttpRequestException)
+        {
+            return RemoteSceneDiscoveryItemCallResult.Unavailable("STAC provider is unavailable.");
+        }
+        catch (JsonException)
+        {
+            return RemoteSceneDiscoveryItemCallResult.InvalidPayload("STAC provider returned invalid JSON.");
+        }
+    }
+
     private static HttpRequestMessage BuildRequest(
         Uri searchUri,
         RemoteSceneDiscoverySearchRequest request,
@@ -186,7 +250,7 @@ public sealed class StacRemoteSceneDiscoveryClient : IRemoteSceneDiscoveryClient
                     roles.AddRange(rolesElement.EnumerateArray()
                         .Where(item => item.ValueKind == JsonValueKind.String)
                         .Select(item => item.GetString())
-                        .Where(item => !string.IsNullOrWhiteSpace(item))!
+                        .Where(item => !string.IsNullOrWhiteSpace(item))
                         .Select(item => item!));
                 }
 
@@ -388,7 +452,10 @@ public sealed class StacRemoteSceneDiscoveryClient : IRemoteSceneDiscoveryClient
     {
         value = default;
         return element.TryGetProperty(property, out var child) && child.ValueKind == JsonValueKind.String &&
-               DateTime.TryParse(child.GetString(), null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out value);
+               DateTime.TryParse(child.GetString(), null,
+                   System.Globalization.DateTimeStyles.AdjustToUniversal |
+                   System.Globalization.DateTimeStyles.AssumeUniversal,
+                   out value);
     }
 
     private static decimal? TryGetDecimal(JsonElement element, string property)
