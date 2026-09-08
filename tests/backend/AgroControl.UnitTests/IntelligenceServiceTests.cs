@@ -91,5 +91,10 @@ public sealed class IntelligenceServiceTests
             CallCount++;
             return Task.FromResult(_result);
         }
+
+        public Task<RasterIntelligenceCallResult> ProcessRasterAsync(
+            RasterProcessingData data,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(RasterIntelligenceCallResult.Unavailable("not configured"));
     }
 }
