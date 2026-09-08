@@ -1,28 +1,62 @@
 using AgroControl.Application.Common;
+using AgroControl.Application.RegionalOperations;
 using AgroControl.Domain.Modules.Fields;
 
 namespace AgroControl.Application.Production;
 
-public sealed class FieldService(IProductionRepository repository, IUnitOfWork unitOfWork)
+public sealed class FieldService(
+    IProductionRepository repository,
+    IFarmAccessScope accessScope,
+    IUnitOfWork unitOfWork)
 {
-    public async Task<PagedResult<FieldDto>> ListAsync(Guid organizationId, int page, int pageSize, Guid? farmId, string? search, bool includeInactive, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<FieldDto>> ListAsync(
+        Guid organizationId,
+        Guid userId,
+        int page,
+        int pageSize,
+        Guid? farmId,
+        string? search,
+        bool includeInactive,
+        CancellationToken cancellationToken = default)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
-        var (items, totalCount) = await repository.ListFieldsAsync(organizationId, (page - 1) * pageSize, pageSize, farmId, search, includeInactive, cancellationToken);
+        var scope = await accessScope.GetEffectiveScopeAsync(organizationId, userId, cancellationToken);
+        if (farmId is not null && !scope.AllFarms && !scope.FarmIds.Contains(farmId.Value))
+            return new PagedResult<FieldDto>(Array.Empty<FieldDto>(), page, pageSize, 0);
+
+        IReadOnlyCollection<Guid>? allowedFarmIds = scope.AllFarms ? null : scope.FarmIds;
+        var (items, totalCount) = await repository.ListFieldsAsync(
+            organizationId,
+            (page - 1) * pageSize,
+            pageSize,
+            farmId,
+            search,
+            includeInactive,
+            allowedFarmIds,
+            cancellationToken);
         return new PagedResult<FieldDto>(items.Select(ToDto).ToList(), page, pageSize, totalCount);
     }
 
-    public async Task<FieldDto?> GetAsync(Guid organizationId, Guid id, CancellationToken cancellationToken = default)
+    public async Task<FieldDto?> GetAsync(Guid organizationId, Guid userId, Guid id, CancellationToken cancellationToken = default)
     {
         var field = await repository.GetFieldAsync(organizationId, id, false, cancellationToken);
-        return field is null ? null : ToDto(field);
+        if (field is null || !await accessScope.CanAccessFarmAsync(organizationId, userId, field.FarmId, cancellationToken))
+            return null;
+        return ToDto(field);
     }
 
-    public async Task<OperationResult<FieldDto>> CreateAsync(Guid organizationId, CreateFieldCommand command, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<FieldDto>> CreateAsync(
+        Guid organizationId,
+        Guid userId,
+        CreateFieldCommand command,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(command.Name) || command.AreaHectares <= 0)
             return OperationResult<FieldDto>.Validation("Name is required and areaHectares must be greater than zero.");
+
+        if (!await accessScope.CanAccessFarmAsync(organizationId, userId, command.FarmId, cancellationToken))
+            return OperationResult<FieldDto>.NotFound("Farm not found.");
 
         var farm = await repository.GetFarmAsync(organizationId, command.FarmId, false, cancellationToken);
         if (farm is null || !farm.IsActive)
@@ -38,14 +72,22 @@ public sealed class FieldService(IProductionRepository repository, IUnitOfWork u
         return OperationResult<FieldDto>.Success(ToDto(field));
     }
 
-    public async Task<OperationResult<FieldDto>> UpdateAsync(Guid organizationId, Guid id, UpdateFieldCommand command, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<FieldDto>> UpdateAsync(
+        Guid organizationId,
+        Guid userId,
+        Guid id,
+        UpdateFieldCommand command,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(command.Name) || command.AreaHectares <= 0)
             return OperationResult<FieldDto>.Validation("Name is required and areaHectares must be greater than zero.");
 
         var field = await repository.GetFieldAsync(organizationId, id, true, cancellationToken);
-        if (field is null)
+        if (field is null || !await accessScope.CanAccessFarmAsync(organizationId, userId, field.FarmId, cancellationToken))
             return OperationResult<FieldDto>.NotFound("Field not found.");
+
+        if (!await accessScope.CanAccessFarmAsync(organizationId, userId, command.FarmId, cancellationToken))
+            return OperationResult<FieldDto>.NotFound("Target farm not found.");
 
         var farm = await repository.GetFarmAsync(organizationId, command.FarmId, false, cancellationToken);
         if (farm is null || !farm.IsActive)
@@ -60,10 +102,14 @@ public sealed class FieldService(IProductionRepository repository, IUnitOfWork u
         return OperationResult<FieldDto>.Success(ToDto(field));
     }
 
-    public async Task<OperationResult<bool>> DeactivateAsync(Guid organizationId, Guid id, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<bool>> DeactivateAsync(
+        Guid organizationId,
+        Guid userId,
+        Guid id,
+        CancellationToken cancellationToken = default)
     {
         var field = await repository.GetFieldAsync(organizationId, id, true, cancellationToken);
-        if (field is null)
+        if (field is null || !await accessScope.CanAccessFarmAsync(organizationId, userId, field.FarmId, cancellationToken))
             return OperationResult<bool>.NotFound("Field not found.");
 
         field.Deactivate(DateTime.UtcNow);
@@ -71,5 +117,12 @@ public sealed class FieldService(IProductionRepository repository, IUnitOfWork u
         return OperationResult<bool>.Success(true);
     }
 
-    private static FieldDto ToDto(Field field) => new(field.Id, field.FarmId, field.Name, field.AreaHectares, field.IsActive, field.CreatedAtUtc, field.UpdatedAtUtc);
+    private static FieldDto ToDto(Field field) => new(
+        field.Id,
+        field.FarmId,
+        field.Name,
+        field.AreaHectares,
+        field.IsActive,
+        field.CreatedAtUtc,
+        field.UpdatedAtUtc);
 }
