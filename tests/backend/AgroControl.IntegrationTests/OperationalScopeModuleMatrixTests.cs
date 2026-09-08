@@ -112,10 +112,10 @@ public sealed class OperationalScopeModuleMatrixTests
                 "Cliente Escopo", null, null, "cliente@scope.test", null, "BR", "Campinas", "SP", CustomerStatus.Prospect, null));
             Assert.True(customer.Succeeded);
             var opportunityA = await commercialService.CreateOpportunityAsync(organization.Id, new CreateCommercialOpportunityCommand(
-                customer.Value!.Id, "Oportunidade A", farmA.Id, fieldA.Id, crop.Id, seasonA.Id, 100_000m, "BRL", 50m,
+                customer.Value!.Id, "Oportunidade A", farmA.Id, crop.Id, seasonA.Id, exportA.Value!.Id, 100_000m, "BRL", 50m,
                 new DateOnly(2026, 10, 31), "Equipe", "Próximo passo A", null));
             var opportunityB = await commercialService.CreateOpportunityAsync(organization.Id, new CreateCommercialOpportunityCommand(
-                customer.Value.Id, "Oportunidade B", farmB.Id, fieldB.Id, crop.Id, seasonB.Id, 200_000m, "BRL", 50m,
+                customer.Value.Id, "Oportunidade B", farmB.Id, crop.Id, seasonB.Id, exportB.Value!.Id, 200_000m, "BRL", 50m,
                 new DateOnly(2026, 10, 31), "Equipe", "Próximo passo B", null));
             Assert.True(opportunityA.Succeeded);
             Assert.True(opportunityB.Succeeded);
