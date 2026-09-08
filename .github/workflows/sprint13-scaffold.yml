@@ -1,0 +1,85 @@
+name: Sprint 13 Scaffold
+
+on:
+  push:
+    branches: ["feat/sprint-13-export"]
+    paths: [".github/workflows/sprint13-scaffold.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/sprint-13-export
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Wire export module
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              if old not in s:
+                  raise SystemExit(f'marker not found: {path}: {old[:100]}')
+              p.write_text(s.replace(old, new, 1))
+
+          p = Path('src/backend/AgroControl.Infrastructure/Persistence/AgroControlDbContext.cs')
+          s = p.read_text()
+          s = s.replace('using AgroControl.Domain.Modules.Crops;\n', 'using AgroControl.Domain.Modules.Crops;\nusing AgroControl.Domain.Modules.Exporting;\n', 1)
+          s = s.replace('    public DbSet<EmissionActivity> EmissionActivities => Set<EmissionActivity>();\n', '    public DbSet<EmissionActivity> EmissionActivities => Set<EmissionActivity>();\n    public DbSet<ExportOrder> ExportOrders => Set<ExportOrder>();\n    public DbSet<ExportDocument> ExportDocuments => Set<ExportDocument>();\n    public DbSet<ExportCost> ExportCosts => Set<ExportCost>();\n    public DbSet<ExportOrderStatusEvent> ExportOrderStatusEvents => Set<ExportOrderStatusEvent>();\n', 1)
+          idx = s.rfind('    }\n}')
+          if idx < 0:
+              raise SystemExit('DbContext closing marker not found')
+          mapping = '''        modelBuilder.Entity<ExportOrder>(entity =>\n        {\n            entity.ToTable("export_orders"); entity.HasKey(x => x.Id);\n            entity.Property(x => x.OrderNumber).HasMaxLength(80).IsRequired();\n            entity.Property(x => x.BuyerName).HasMaxLength(200).IsRequired();\n            entity.Property(x => x.BuyerReference).HasMaxLength(120);\n            entity.Property(x => x.DestinationCountryCode).HasMaxLength(2).IsRequired();\n            entity.Property(x => x.ProductDescription).HasMaxLength(240).IsRequired();\n            entity.Property(x => x.Quantity).HasPrecision(18, 6).IsRequired();\n            entity.Property(x => x.Unit).HasMaxLength(32).IsRequired();\n            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();\n            entity.Property(x => x.UnitPrice).HasPrecision(18, 4).IsRequired();\n            entity.Property(x => x.ExchangeRateToBrl).HasPrecision(18, 6).IsRequired();\n            entity.Property(x => x.Incoterm).HasConversion<string>().HasMaxLength(8).IsRequired();\n            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();\n            entity.Property(x => x.OriginLocation).HasMaxLength(200);\n            entity.Property(x => x.DestinationLocation).HasMaxLength(200);\n            entity.Property(x => x.ShipmentReference).HasMaxLength(160);\n            entity.Property(x => x.BookingReference).HasMaxLength(160);\n            entity.Property(x => x.ContainerReference).HasMaxLength(160);\n            entity.Property(x => x.Notes).HasMaxLength(1200);\n            entity.Ignore(x => x.CommercialValue); entity.Ignore(x => x.EstimatedValueBrl); entity.Ignore(x => x.IsTerminal);\n            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict);\n            entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);\n            entity.HasOne<Crop>().WithMany().HasForeignKey(x => x.CropId).OnDelete(DeleteBehavior.Restrict);\n            entity.HasOne<Season>().WithMany().HasForeignKey(x => x.SeasonId).OnDelete(DeleteBehavior.Restrict);\n            entity.HasIndex(x => x.OrganizationId);\n            entity.HasIndex(x => new { x.OrganizationId, x.OrderNumber }).IsUnique();\n            entity.HasIndex(x => new { x.OrganizationId, x.Status, x.CreatedAtUtc });\n            entity.HasIndex(x => new { x.OrganizationId, x.DestinationCountryCode, x.CreatedAtUtc });\n            entity.HasIndex(x => x.FarmId); entity.HasIndex(x => x.FieldId); entity.HasIndex(x => x.CropId); entity.HasIndex(x => x.SeasonId);\n        });\n        modelBuilder.Entity<ExportDocument>(entity =>\n        {\n            entity.ToTable("export_documents"); entity.HasKey(x => x.Id);\n            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(48).IsRequired();\n            entity.Property(x => x.CustomLabel).HasMaxLength(160);\n            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();\n            entity.Property(x => x.ReferenceNumber).HasMaxLength(160);\n            entity.Property(x => x.Notes).HasMaxLength(1000);\n            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasOne<ExportOrder>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.OrderId);\n            entity.HasIndex(x => new { x.OrganizationId, x.OrderId, x.Status });\n        });\n        modelBuilder.Entity<ExportCost>(entity =>\n        {\n            entity.ToTable("export_costs"); entity.HasKey(x => x.Id);\n            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired();\n            entity.Property(x => x.Description).HasMaxLength(240).IsRequired();\n            entity.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();\n            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();\n            entity.Property(x => x.ExchangeRateToBrl).HasPrecision(18, 6).IsRequired();\n            entity.Property(x => x.AmountBrl).HasPrecision(18, 2).IsRequired();\n            entity.Property(x => x.Notes).HasMaxLength(1000);\n            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasOne<ExportOrder>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.OrderId);\n            entity.HasIndex(x => new { x.OrganizationId, x.OrderId, x.IncurredOn });\n        });\n        modelBuilder.Entity<ExportOrderStatusEvent>(entity =>\n        {\n            entity.ToTable("export_order_status_events"); entity.HasKey(x => x.Id);\n            entity.Property(x => x.FromStatus).HasConversion<string>().HasMaxLength(32);\n            entity.Property(x => x.ToStatus).HasConversion<string>().HasMaxLength(32).IsRequired();\n            entity.Property(x => x.Notes).HasMaxLength(1000);\n            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasOne<ExportOrder>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.OrderId);\n            entity.HasIndex(x => new { x.OrganizationId, x.OrderId, x.OccurredOn });\n        });\n'''
+          s = s[:idx] + mapping + s[idx:]
+          p.write_text(s)
+
+          replace('src/backend/AgroControl.Infrastructure/DependencyInjection.cs', 'using AgroControl.Application.Finance;\n', 'using AgroControl.Application.Finance;\nusing AgroControl.Application.Exporting;\n')
+          replace('src/backend/AgroControl.Infrastructure/DependencyInjection.cs', '        services.AddScoped<ISustainabilityRepository, SustainabilityRepository>();\n', '        services.AddScoped<ISustainabilityRepository, SustainabilityRepository>();\n        services.AddScoped<IExportRepository, ExportRepository>();\n')
+
+          replace('src/backend/AgroControl.Api/Program.cs', 'using AgroControl.Application.Finance;\n', 'using AgroControl.Application.Finance;\nusing AgroControl.Application.Exporting;\n')
+          replace('src/backend/AgroControl.Api/Program.cs', 'builder.Services.AddScoped<SustainabilityService>();\n', 'builder.Services.AddScoped<SustainabilityService>();\nbuilder.Services.AddScoped<ExportService>();\n')
+          replace('src/backend/AgroControl.Api/Program.cs', 'version = "0.12.0"', 'version = "0.13.0"')
+          replace('src/backend/AgroControl.Api/Program.cs', 'app.MapSustainabilityEndpoints();\n', 'app.MapSustainabilityEndpoints();\napp.MapExportEndpoints();\n')
+
+          replace('src/backend/AgroControl.Application/Platform/ModuleCatalog.cs', 'new(ModuleKey.Export, "Export", ModuleStatus.Locked, "Comércio exterior, câmbio e logística."),', 'new(ModuleKey.Export, "Export", ModuleStatus.Active, "Pedidos internacionais, câmbio, documentos e logística."),')
+
+          replace('src/frontend/src/App.tsx', "import { SustainabilityPage } from './pages/SustainabilityPage';\n", "import { SustainabilityPage } from './pages/SustainabilityPage';\nimport { ExportPage } from './pages/ExportPage';\n")
+          replace('src/frontend/src/App.tsx', '          <Route path="sustainability" element={<SustainabilityPage />} />\n', '          <Route path="sustainability" element={<SustainabilityPage />} />\n          <Route path="export" element={<ExportPage />} />\n')
+          replace('src/frontend/src/components/AppShell.tsx', "  { to: '/sustainability', label: 'Sustentabilidade', icon: 'leaf' as const, module: 'Sustainability' },\n", "  { to: '/sustainability', label: 'Sustentabilidade', icon: 'leaf' as const, module: 'Sustainability' },\n  { to: '/export', label: 'Exportação', icon: 'box' as const, module: 'Export' },\n")
+          PY
+      - name: Restore backend
+        run: dotnet restore AgroControl.sln
+      - name: Build debug for EF
+        run: dotnet build AgroControl.sln --configuration Debug --no-restore
+      - name: Install EF tool
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+      - name: Generate ExportCore migration
+        run: dotnet ef migrations add ExportCore --project src/backend/AgroControl.Infrastructure --startup-project src/backend/AgroControl.Infrastructure --no-build
+      - name: Validate backend
+        run: dotnet test AgroControl.sln --configuration Release --no-restore
+        env:
+          AGROCONTROL_TEST_CONNECTION_STRING: Host=localhost;Port=5432;Database=agrocontrol_test;Username=postgres;Password=postgres
+      - name: Validate frontend
+        working-directory: src/frontend
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+      - name: Commit generated wiring and migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests
+          git commit -m "feat(export): wire module and generate migration"
+          git push origin HEAD:feat/sprint-13-export
