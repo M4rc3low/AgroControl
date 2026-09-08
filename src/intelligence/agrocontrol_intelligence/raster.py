@@ -157,7 +157,7 @@ def compute_zonal_statistics_many(
                 crs=dataset.crs.to_string(),
                 width=dataset.width,
                 height=dataset.height,
-                nodata=None if dataset.nodata is None else float(dataset.nodata),
+                nodata=None if dataset.nodata is None or not np.isfinite(dataset.nodata) else float(dataset.nodata),
                 resolution_x=float(abs(dataset.res[0])),
                 resolution_y=float(abs(dataset.res[1])),
             )
