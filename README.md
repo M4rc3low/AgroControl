@@ -2,8 +2,8 @@
 
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência e processamento científico, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 18 concluída — operação multi-fazenda, gestão regional, autorização horizontal e visão consolidada**  
-> API: **0.18.0**
+> Status atual: **Sprint 19 concluída — STAC, descoberta de cenas e importação controlada**  
+> API: **0.19.0**
 
 ## Objetivo
 
@@ -22,6 +22,7 @@ Hoje o AgroControl cobre:
 - acesso `AllFarms`, por região e por fazenda;
 - limites geográficos, GeoJSON, PostGIS e zonas de manejo;
 - cenas de satélite/drone, footprints e índices vegetativos;
+- descoberta STAC de cenas externas e importação controlada por asset;
 - processamento raster com Rasterio/NumPy e estatísticas zonais;
 - estoque e movimentações de insumos;
 - custos, receitas, fluxo de caixa e rentabilidade;
@@ -49,6 +50,7 @@ Os módulos são liberados por plano e o bloqueio é validado no backend, não a
 | Banco de telemetria | PostgreSQL dedicado |
 | Mensageria IoT | MQTT + Eclipse Mosquitto |
 | Mapas | MapLibre GL + GeoJSON |
+| Catálogo geoespacial | STAC API / STAC Items |
 | Autenticação | JWT |
 | Containers | Docker / Docker Compose |
 | Observabilidade | OpenTelemetry + Prometheus + Tempo + Grafana |
@@ -64,6 +66,7 @@ flowchart TB
     API --> DB[(PostgreSQL + PostGIS Core)]
     API --> AI[AgroControl Intelligence\nPython / FastAPI / Rasterio]
     API --> TEL[AgroControl Telemetry\nJava / Spring Boot]
+    API --> STAC[STAC Provider configurado]
     TEL --> TDB[(PostgreSQL Telemetry)]
     SENSORS[Sensores / GPS / Estações / Máquinas] --> MQTT[MQTT / Mosquitto]
     MQTT --> TEL
@@ -120,6 +123,7 @@ A proteção horizontal é aplicada em:
 - comercial;
 - agricultura de precisão;
 - sensoriamento remoto;
+- descoberta/importação STAC;
 - raster;
 - telemetria vinculada a Farm/Field/Machine.
 
@@ -137,6 +141,8 @@ Testes automatizados exercitam acesso **Fazenda A × Fazenda B dentro da mesma o
 - CRUD de produção rural;
 - Agricultura de Precisão com limites e zonas de manejo;
 - workspace de sensoriamento remoto;
+- rota de descoberta STAC com filtros, paginação e preview de footprint;
+- importação explícita de cena/asset;
 - painel de processamento raster;
 - irrigação, sustentabilidade, exportação e Comercial/CRM;
 - estados de loading, vazio, erro e módulo bloqueado;
@@ -164,6 +170,10 @@ Eventos técnicos permanecem em UTC. A apresentação operacional usa o timezone
 - zonas `Soil`, `Yield`, `Vegetation`, `Prescription` e `Custom`;
 - importação/exportação GeoJSON;
 - cenas `Satellite`, `Drone` e `Other`;
+- descoberta externa por STAC usando providers configurados no backend;
+- busca por boundary canônico do talhão;
+- normalização de collection, datetime, cloud cover, GSD, platform/constellation e assets;
+- importação controlada com reconsulta server-side do item e seleção por `AssetKey`;
 - NDVI, NDRE, EVI e índices customizados;
 - séries temporais e latest metrics;
 - Rasterio + NumPy para GeoTIFF/COG;
@@ -172,7 +182,9 @@ Eventos técnicos permanecem em UTC. A apresentação operacional usa o timezone
 - lifecycle `Pending`, `Processing`, `Succeeded` e `Failed`;
 - idempotência por chave de processamento;
 - limites MVP de 20 milhões de pixels e 250 geometrias;
-- assets remotos desabilitados por padrão.
+- assets remotos do Intelligence desabilitados por padrão.
+
+A descoberta STAC não baixa nem processa raster automaticamente. Importação e processamento são ações separadas.
 
 NDVI, NDRE, EVI, previsões e resultados raster são **apoio à decisão** e não diagnóstico agronômico automático nem garantia de produtividade.
 
@@ -285,6 +297,20 @@ Observabilidade opcional:
 OTEL_ENABLED=true docker compose --profile observability up --build
 ```
 
+## Configuração STAC
+
+Providers de descoberta são configurados no backend em `RemoteSensing:Stac:Providers`.
+
+Exemplo atual:
+
+```text
+RemoteSensing__Stac__Providers__earth-search__BaseUrl
+RemoteSensing__Stac__Providers__earth-search__Enabled
+RemoteSensing__Stac__Providers__earth-search__Collections__0
+```
+
+A Web não recebe nem escolhe uma URL arbitrária de catálogo. Apenas providers habilitados pelo backend são expostos.
+
 ## Health checks
 
 ```text
@@ -321,6 +347,9 @@ DELETE /api/v1/operations/farm-access/{assignmentId}
 
 /api/v1/precision/*
 /api/v1/precision/remote-sensing/*
+GET  /api/v1/precision/remote-sensing/discovery/providers
+POST /api/v1/precision/remote-sensing/discovery/search
+POST /api/v1/precision/remote-sensing/discovery/import
 POST /api/v1/precision/remote-sensing/scenes/{sceneId}/process
 GET  /api/v1/precision/remote-sensing/scenes/{sceneId}/processings
 GET  /api/v1/precision/remote-sensing/processing-results
@@ -356,7 +385,7 @@ Segredos reais não entram no repositório.
 - **CodeQL:** C#, Java/Kotlin, Python e JavaScript/TypeScript;
 - **Dependabot:** NuGet, pip, Maven, npm e GitHub Actions.
 
-A Sprint 18 foi mesclada somente depois de **Backend CI + Frontend CI + Platform CI + CodeQL** ficarem verdes no mesmo head do PR #51.
+A Sprint 19 só é encerrada depois de **Backend CI + Frontend CI + Platform CI + CodeQL** verdes no mesmo head do PR #56.
 
 ## Documentação
 
@@ -377,6 +406,7 @@ A Sprint 18 foi mesclada somente depois de **Backend CI + Frontend CI + Platform
 - [`docs/SPRINT_16_REMOTE_SENSING.md`](docs/SPRINT_16_REMOTE_SENSING.md)
 - [`docs/SPRINT_17_RASTER_PROCESSING.md`](docs/SPRINT_17_RASTER_PROCESSING.md)
 - [`docs/SPRINT_18_MULTI_FARM.md`](docs/SPRINT_18_MULTI_FARM.md)
+- [`docs/SPRINT_19_STAC_DISCOVERY.md`](docs/SPRINT_19_STAC_DISCOVERY.md)
 
 ## Roadmap resumido
 
@@ -399,6 +429,7 @@ A Sprint 18 foi mesclada somente depois de **Backend CI + Frontend CI + Platform
 17. ✅ Sprint 16 — sensoriamento remoto e índices vegetativos.
 18. ✅ Sprint 17 — processamento raster e estatísticas zonais.
 19. ✅ Sprint 18 — operação multi-fazenda, gestão regional e autorização horizontal.
+20. ✅ Sprint 19 — STAC, descoberta de cenas e importação controlada.
 
 O hardening dependente de ambiente real, política operacional ou testes de carga permanece separado no issue **#18**.
 
@@ -408,7 +439,9 @@ Defaults do repositório são apenas de desenvolvimento. Em produção, `JWT_KEY
 
 O mapa usa URLs configuráveis. Credenciais de provedores de tiles/imagens não devem ser tratadas como segredo confiável quando expostas ao navegador.
 
-Assets raster remotos permanecem desabilitados por padrão. Quando habilitados, devem ser combinados em produção com allowlists, egress control e credenciais gerenciadas; referências remotas não devem transportar credenciais na URL.
+STAC providers são definidos no backend. O browser não pode transformar a API em proxy arbitrário: continuação é restringida ao mesmo origin/path, referências de asset são normalizadas e query strings são removidas antes de persistência/importação.
+
+Assets raster remotos no Intelligence permanecem desabilitados por padrão. Quando habilitados, devem ser combinados em produção com allowlists, egress control e credenciais gerenciadas; referências remotas não devem transportar credenciais na URL.
 
 O JWT do frontend usa `sessionStorage` por compatibilidade com o contrato bearer atual. Uma evolução para BFF/cookie HttpOnly pode ser adotada quando o modelo de exposição pública justificar esse endurecimento.
 
