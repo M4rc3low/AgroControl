@@ -1,86 +1,85 @@
 from pathlib import Path
 
-context_path = Path('src/backend/AgroControl.Application/RegionalOperations/OperationalScopeContext.cs')
-context_path.write_text('''namespace AgroControl.Application.RegionalOperations;\n\npublic interface IOperationalScopeContext\n{\n    bool IsInitialized { get; }\n    bool IsRestricted { get; }\n    Guid OrganizationId { get; }\n    Guid UserId { get; }\n    IReadOnlyList<Guid> FarmIds { get; }\n    IReadOnlyList<Guid> RegionIds { get; }\n}\n\npublic sealed class OperationalScopeContext : IOperationalScopeContext\n{\n    private Guid[] _farmIds = [];\n    private Guid[] _regionIds = [];\n\n    public bool IsInitialized { get; private set; }\n    public bool IsRestricted { get; private set; }\n    public Guid OrganizationId { get; private set; }\n    public Guid UserId { get; private set; }\n    public IReadOnlyList<Guid> FarmIds => _farmIds;\n    public IReadOnlyList<Guid> RegionIds => _regionIds;\n\n    public void Initialize(Guid organizationId, Guid userId, FarmAccessScopeSnapshot scope)\n    {\n        if (organizationId == Guid.Empty) throw new ArgumentException("Organization id is required.", nameof(organizationId));\n        if (userId == Guid.Empty) throw new ArgumentException("User id is required.", nameof(userId));\n        ArgumentNullException.ThrowIfNull(scope);\n\n        OrganizationId = organizationId;\n        UserId = userId;\n        _farmIds = scope.FarmIds.Distinct().ToArray();\n        _regionIds = scope.RegionIds.Distinct().ToArray();\n        IsRestricted = !scope.AllFarms;\n        IsInitialized = true;\n    }\n}\n''')
 
-
-def replace_once(path, old, new):
-    p = Path(path)
-    s = p.read_text()
-    if old not in s:
-        raise SystemExit(f'marker not found in {path}: {old[:120]!r}')
-    p.write_text(s.replace(old, new, 1))
-
-
-di = 'src/backend/AgroControl.Infrastructure/DependencyInjection.cs'
-replace_once(
-    di,
-    '        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");\n        services.AddDbContext<AgroControlDbContext>(options => options.UseNpgsql(connectionString));',
-    '        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");\n        services.AddScoped<OperationalScopeContext>();\n        services.AddScoped<IOperationalScopeContext>(provider => provider.GetRequiredService<OperationalScopeContext>());\n        services.AddDbContext<AgroControlDbContext>(options => options.UseNpgsql(connectionString));')
-
-program = 'src/backend/AgroControl.Api/Program.cs'
-replace_once(
-    program,
-    'app.UseAuthentication();\napp.UseAuthorization();',
-    '''app.UseAuthentication();
-app.Use(async (httpContext, next) =>
-{
-    if (httpContext.User.Identity?.IsAuthenticated == true &&
-        TryGetOrganizationId(httpContext.User, out var organizationId) &&
-        TryGetUserId(httpContext.User, out var userId))
-    {
-        var currentScope = httpContext.RequestServices.GetRequiredService<OperationalScopeContext>();
-        var accessScope = httpContext.RequestServices.GetRequiredService<IFarmAccessScope>();
-        var snapshot = await accessScope.GetEffectiveScopeAsync(organizationId, userId, httpContext.RequestAborted);
-        currentScope.Initialize(organizationId, userId, snapshot);
-    }
-
-    await next();
-});
-app.UseAuthorization();''')
-replace_once(
-    program,
-    'static bool TryGetOrganizationId(ClaimsPrincipal principal, out Guid organizationId) => Guid.TryParse(principal.FindFirstValue("org_id"), out organizationId);',
-    'static bool TryGetOrganizationId(ClaimsPrincipal principal, out Guid organizationId) => Guid.TryParse(principal.FindFirstValue("org_id"), out organizationId);\nstatic bool TryGetUserId(ClaimsPrincipal principal, out Guid userId) => Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out userId);')
-
-db = Path('src/backend/AgroControl.Infrastructure/Persistence/AgroControlDbContext.cs')
-s = db.read_text()
-s = s.replace('using AgroControl.Domain.Modules.Crops;\n', 'using AgroControl.Application.RegionalOperations;\nusing AgroControl.Domain.Modules.Crops;\n', 1)
-s = s.replace(
-    'public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> options) : DbContext(options)\n{',
-    '''public sealed class AgroControlDbContext(
-    DbContextOptions<AgroControlDbContext> options,
-    IOperationalScopeContext? operationalScope = null) : DbContext(options)
-{
-    private bool RestrictFarmScope => operationalScope is { IsInitialized: true, IsRestricted: true };
-    private Guid[] ScopedFarmIds => operationalScope?.FarmIds.ToArray() ?? [];''', 1)
-
-filters = {
-    'Farm': '!RestrictFarmScope || ScopedFarmIds.Contains(x.Id)',
-    'Field': '!RestrictFarmScope || ScopedFarmIds.Contains(x.FarmId)',
-    'Season': '!RestrictFarmScope || Fields.Any(field => field.Id == x.FieldId && ScopedFarmIds.Contains(field.FarmId))',
-    'Warehouse': '!RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value)',
-    'StockMovement': '!RestrictFarmScope || (x.FarmId != null && ScopedFarmIds.Contains(x.FarmId.Value)) || (x.FarmId == null && Warehouses.Any(warehouse => warehouse.Id == x.WarehouseId && (warehouse.FarmId == null || ScopedFarmIds.Contains(warehouse.FarmId.Value))))',
-    'FinancialTransaction': '!RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value)',
-    'Machine': '!RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value)',
-    'HourMeterReading': '!RestrictFarmScope || Machines.Any(machine => machine.Id == x.MachineId && (machine.FarmId == null || ScopedFarmIds.Contains(machine.FarmId.Value)))',
-    'Fueling': '!RestrictFarmScope || Machines.Any(machine => machine.Id == x.MachineId && (machine.FarmId == null || ScopedFarmIds.Contains(machine.FarmId.Value)))',
-    'MaintenanceRecord': '!RestrictFarmScope || Machines.Any(machine => machine.Id == x.MachineId && (machine.FarmId == null || ScopedFarmIds.Contains(machine.FarmId.Value)))',
-    'IrrigationZone': '!RestrictFarmScope || Fields.Any(field => field.Id == x.FieldId && ScopedFarmIds.Contains(field.FarmId))',
-    'IrrigationApplication': '!RestrictFarmScope || Fields.Any(field => field.Id == x.FieldId && ScopedFarmIds.Contains(field.FarmId))',
-    'EmissionActivity': '!RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value)',
-    'ExportOrder': '!RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value)',
-    'ExportDocument': '!RestrictFarmScope || ExportOrders.Any(order => order.Id == x.OrderId)',
-    'ExportCost': '!RestrictFarmScope || ExportOrders.Any(order => order.Id == x.OrderId)',
-    'ExportOrderStatusEvent': '!RestrictFarmScope || ExportOrders.Any(order => order.Id == x.OrderId)',
-    'CommercialOpportunity': '!RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value)',
-    'OpportunityStageEvent': '!RestrictFarmScope || CommercialOpportunities.Any(opportunity => opportunity.Id == x.OpportunityId)',
-}
-
-for entity, expr in filters.items():
-    marker = f'modelBuilder.Entity<{entity}>(entity =>\n        {{'
+def patch_precision() -> None:
+    path = Path('src/backend/AgroControl.Infrastructure/Persistence/PrecisionAgricultureRepository.cs')
+    s = path.read_text()
+    s = s.replace('using AgroControl.Application.PrecisionAgriculture;\n', 'using AgroControl.Application.PrecisionAgriculture;\nusing AgroControl.Application.RegionalOperations;\n', 1)
+    s = s.replace(
+        'public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContext) : IPrecisionAgricultureRepository',
+        'public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContext, IOperationalScopeContext? operationalScope = null) : IPrecisionAgricultureRepository', 1)
+    s = s.replace('const string sql = """', 'var sql = $"""')
+    s = s.replace('WHERE f."OrganizationId" = @organizationId', 'WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")}')
+    s = s.replace('WHERE z."OrganizationId" = @organizationId', 'WHERE z."OrganizationId" = @organizationId{ZoneScopeSql("z")}')
+    marker = '    private static void AddParameter(DbCommand command, string name, object? value)\n'
     if marker not in s:
-        raise SystemExit(f'entity block not found: {entity}')
-    s = s.replace(marker, marker + f'\n            entity.HasQueryFilter(x => {expr});', 1)
+        raise SystemExit('Precision AddParameter marker not found')
+    helpers = '''    private string FieldScopeSql(string alias)\n    {\n        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;\n        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";\n        return $" AND {alias}.\\\"FarmId\\\" IN ({FarmIdSqlList()})";\n    }\n\n    private string ZoneScopeSql(string alias)\n    {\n        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;\n        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";\n        return $" AND EXISTS (SELECT 1 FROM fields AS scope_field WHERE scope_field.\\\"OrganizationId\\\" = @organizationId AND scope_field.\\\"Id\\\" = {alias}.\\\"FieldId\\\" AND scope_field.\\\"FarmId\\\" IN ({FarmIdSqlList()}))";\n    }\n\n    private string FarmIdSqlList() => string.Join(", ", operationalScope!.FarmIds.Select(id => $"'{id:D}'::uuid"));\n\n'''
+    s = s.replace(marker, helpers + marker, 1)
+    path.write_text(s)
 
-db.write_text(s)
+
+def patch_remote() -> None:
+    path = Path('src/backend/AgroControl.Infrastructure/Persistence/RemoteSensingRepository.cs')
+    s = path.read_text()
+    s = s.replace('using AgroControl.Application.PrecisionAgriculture;\n', 'using AgroControl.Application.PrecisionAgriculture;\nusing AgroControl.Application.RegionalOperations;\n', 1)
+    s = s.replace(
+        'public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IRemoteSensingRepository',
+        'public sealed class RemoteSensingRepository(AgroControlDbContext dbContext, IOperationalScopeContext? operationalScope = null) : IRemoteSensingRepository', 1)
+    s = s.replace('const string filter = """', 'var filter = $"""')
+    s = s.replace('const string sql = """', 'var sql = $"""')
+    s = s.replace('WHERE s."OrganizationId" = @organizationId', 'WHERE s."OrganizationId" = @organizationId{SceneScopeSql("s")}')
+    s = s.replace('WHERE o."OrganizationId" = @organizationId', 'WHERE o."OrganizationId" = @organizationId{ObservationScopeSql("o")}')
+    s = s.replace('WHERE f."OrganizationId" = @organizationId', 'WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")}')
+    marker = '    private static void AddParameter(DbCommand command, string name, object? value)\n'
+    if marker not in s:
+        raise SystemExit('Remote AddParameter marker not found')
+    helpers = '''    private string FieldScopeSql(string alias)\n    {\n        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;\n        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";\n        return $" AND {alias}.\\\"FarmId\\\" IN ({FarmIdSqlList()})";\n    }\n\n    private string SceneScopeSql(string alias) => FieldReferenceScopeSql($"{alias}.\\\"FieldId\\\"");\n    private string ObservationScopeSql(string alias) => FieldReferenceScopeSql($"{alias}.\\\"FieldId\\\"");\n\n    private string FieldReferenceScopeSql(string fieldIdExpression)\n    {\n        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;\n        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";\n        return $" AND EXISTS (SELECT 1 FROM fields AS scope_field WHERE scope_field.\\\"OrganizationId\\\" = @organizationId AND scope_field.\\\"Id\\\" = {fieldIdExpression} AND scope_field.\\\"FarmId\\\" IN ({FarmIdSqlList()}))";\n    }\n\n    private string FarmIdSqlList() => string.Join(", ", operationalScope!.FarmIds.Select(id => $"'{id:D}'::uuid"));\n\n'''
+    s = s.replace(marker, helpers + marker, 1)
+    path.write_text(s)
+
+
+def patch_raster() -> None:
+    path = Path('src/backend/AgroControl.Infrastructure/Persistence/RasterProcessingRepository.cs')
+    s = path.read_text()
+    s = s.replace('using AgroControl.Application.PrecisionAgriculture;\n', 'using AgroControl.Application.PrecisionAgriculture;\nusing AgroControl.Application.RegionalOperations;\n', 1)
+    s = s.replace(
+        'public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) : IRasterProcessingRepository',
+        'public sealed class RasterProcessingRepository(AgroControlDbContext dbContext, IOperationalScopeContext? operationalScope = null) : IRasterProcessingRepository', 1)
+    s = s.replace(
+        'RunSelect + " WHERE r.\\\"OrganizationId\\\" = @organizationId AND r.\\\"ProcessingKey\\\" = @processingKey;"',
+        'RunSelect + $" WHERE r.\\\"OrganizationId\\\" = @organizationId AND r.\\\"ProcessingKey\\\" = @processingKey{RunScopeSql("r")};"')
+    s = s.replace(
+        'RunSelect + " WHERE r.\\\"OrganizationId\\\" = @organizationId AND r.\\\"SceneId\\\" = @sceneId ORDER BY r.\\\"RequestedAtUtc\\\" DESC;"',
+        'RunSelect + $" WHERE r.\\\"OrganizationId\\\" = @organizationId AND r.\\\"SceneId\\\" = @sceneId{RunScopeSql("r")} ORDER BY r.\\\"RequestedAtUtc\\\" DESC;"')
+    s = s.replace(
+        'ResultSelect + " WHERE z.\\\"OrganizationId\\\" = @organizationId AND z.\\\"RunId\\\" = @runId ORDER BY z.\\\"ManagementZoneId\\\" NULLS FIRST, z.\\\"Id\\\";"',
+        'ResultSelect + $" WHERE z.\\\"OrganizationId\\\" = @organizationId AND z.\\\"RunId\\\" = @runId{ResultScopeSql("z")} ORDER BY z.\\\"ManagementZoneId\\\" NULLS FIRST, z.\\\"Id\\\";"')
+    s = s.replace(
+        'QueryRunSingleAsync(RunSelect + " WHERE r.\\\"OrganizationId\\\" = @organizationId AND r.\\\"Id\\\" = @runId;",',
+        'QueryRunSingleAsync(RunSelect + $" WHERE r.\\\"OrganizationId\\\" = @organizationId AND r.\\\"Id\\\" = @runId{RunScopeSql("r")};",')
+    s = s.replace('const string filter = """', 'var filter = $"""')
+    s = s.replace('WHERE z."OrganizationId" = @organizationId\n', 'WHERE z."OrganizationId" = @organizationId{ResultScopeSql("z")}\n', 1)
+    s = s.replace(
+        'WHERE s."OrganizationId" = @organizationId AND s."Id" = @sceneId AND s."IsActive";',
+        'WHERE s."OrganizationId" = @organizationId AND s."Id" = @sceneId AND s."IsActive"{SceneScopeSql("s")};', 1)
+    s = s.replace('command.CommandText = """\n                        INSERT INTO raster_products', 'command.CommandText = $"""\n                        INSERT INTO raster_products', 1)
+    s = s.replace('UPDATE raster_processing_runs SET "Status" = \'Processing\'', 'UPDATE raster_processing_runs AS r SET "Status" = \'Processing\'', 1)
+    s = s.replace('WHERE "OrganizationId" = @organizationId AND "Id" = @runId AND "Status" = \'Pending\';', 'WHERE r."OrganizationId" = @organizationId AND r."Id" = @runId AND r."Status" = \'Pending\'{RunScopeSql("r")};', 1)
+    s = s.replace('UPDATE raster_processing_runs\n            SET "Status" = \'Failed\'', 'UPDATE raster_processing_runs AS r\n            SET "Status" = \'Failed\'', 1)
+    s = s.replace('WHERE "OrganizationId" = @organizationId AND "Id" = @runId AND "Status" IN (\'Pending\', \'Processing\');', 'WHERE r."OrganizationId" = @organizationId AND r."Id" = @runId AND r."Status" IN (\'Pending\', \'Processing\'){RunScopeSql("r")};', 1)
+    s = s.replace('SELECT "ProductId" FROM raster_processing_runs\n                        WHERE "OrganizationId" = @organizationId AND "Id" = @runId AND "Status" = \'Processing\'', 'SELECT r."ProductId" FROM raster_processing_runs AS r\n                        WHERE r."OrganizationId" = @organizationId AND r."Id" = @runId AND r."Status" = \'Processing\'{RunScopeSql("r")}', 1)
+    s = s.replace('await ExecuteNonQueryAsync("""\n            UPDATE raster_processing_runs AS r SET', 'await ExecuteNonQueryAsync($"""\n            UPDATE raster_processing_runs AS r SET', 1)
+    s = s.replace('await ExecuteNonQueryAsync("""\n            UPDATE raster_processing_runs AS r\n', 'await ExecuteNonQueryAsync($"""\n            UPDATE raster_processing_runs AS r\n', 1)
+    s = s.replace('command.CommandText = """\n                        SELECT r."ProductId"', 'command.CommandText = $"""\n                        SELECT r."ProductId"', 1)
+    marker = '    private static void AddParameter(DbCommand command, string name, object? value)\n'
+    if marker not in s:
+        raise SystemExit('Raster AddParameter marker not found')
+    helpers = '''    private string SceneScopeSql(string alias) => FieldReferenceScopeSql($"{alias}.\\\"FieldId\\\"");\n    private string ResultScopeSql(string alias) => FieldReferenceScopeSql($"{alias}.\\\"FieldId\\\"");\n\n    private string RunScopeSql(string alias)\n    {\n        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;\n        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";\n        return $" AND EXISTS (SELECT 1 FROM remote_sensing_scenes AS scope_scene JOIN fields AS scope_field ON scope_field.\\\"Id\\\" = scope_scene.\\\"FieldId\\\" AND scope_field.\\\"OrganizationId\\\" = scope_scene.\\\"OrganizationId\\\" WHERE scope_scene.\\\"OrganizationId\\\" = @organizationId AND scope_scene.\\\"Id\\\" = {alias}.\\\"SceneId\\\" AND scope_field.\\\"FarmId\\\" IN ({FarmIdSqlList()}))";\n    }\n\n    private string FieldReferenceScopeSql(string fieldIdExpression)\n    {\n        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;\n        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";\n        return $" AND EXISTS (SELECT 1 FROM fields AS scope_field WHERE scope_field.\\\"OrganizationId\\\" = @organizationId AND scope_field.\\\"Id\\\" = {fieldIdExpression} AND scope_field.\\\"FarmId\\\" IN ({FarmIdSqlList()}))";\n    }\n\n    private string FarmIdSqlList() => string.Join(", ", operationalScope!.FarmIds.Select(id => $"'{id:D}'::uuid"));\n\n'''
+    s = s.replace(marker, helpers + marker, 1)
+    path.write_text(s)
+
+
+patch_precision()
+patch_remote()
+patch_raster()
