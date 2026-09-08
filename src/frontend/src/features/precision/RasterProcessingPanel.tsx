@@ -48,7 +48,7 @@ export function RasterProcessingPanel({ scene, zones, onProcessed }: { scene: Re
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!scene) return;
+    if (!scene?.assetReference) return;
     const form = new FormData(event.currentTarget);
     setProcessing(true); setError(null);
     try {
@@ -58,7 +58,7 @@ export function RasterProcessingPanel({ scene, zones, onProcessed }: { scene: Re
         body: JSON.stringify({
           productType,
           customProductName: productType === 'Custom' ? String(form.get('customProductName') ?? '').trim() || null : null,
-          assetReference: String(form.get('assetReference') ?? '').trim() || null,
+          assetReference: null,
           band: Number(form.get('band') ?? 1),
           includeManagementZones: form.get('includeManagementZones') === 'on',
           processingKey: null
@@ -80,10 +80,11 @@ export function RasterProcessingPanel({ scene, zones, onProcessed }: { scene: Re
 
   return <Card className="raster-panel">
     <div className="raster-panel__header">
-      <div><span className="eyebrow">Processamento científico</span><h2>Raster e estatísticas zonais</h2><p>Rasterio + NumPy processam o asset no Intelligence; o core persiste somente metadados e resultados rastreáveis.</p></div>
-      <div className="raster-panel__actions"><Button variant="secondary" onClick={() => void load()} disabled={loading}>Atualizar</Button><Button onClick={() => setModalOpen(true)} disabled={!scene.assetReference && processing}>Processar raster</Button></div>
+      <div><span className="eyebrow">Processamento científico</span><h2>Raster e estatísticas zonais</h2><p>Rasterio + NumPy processam o asset registrado na cena; o core persiste somente metadados e resultados rastreáveis.</p></div>
+      <div className="raster-panel__actions"><Button variant="secondary" onClick={() => void load()} disabled={loading}>Atualizar</Button><Button onClick={() => setModalOpen(true)} disabled={!scene.assetReference || processing}>Processar raster</Button></div>
     </div>
     {error && <div className="inline-warning">{error}</div>}
+    {!scene.assetReference && <div className="inline-warning">Esta cena ainda não possui um asset raster registrado. Edite a cena antes de iniciar o processamento.</div>}
     {loading && !runs.length ? <Spinner label="Carregando processamentos" /> : <>
       <div className="raster-run-grid">
         <div><span>Último status</span>{latest ? <Badge tone={statusTone(latest.status)}>{statusLabel(latest.status)}</Badge> : <strong>—</strong>}</div>
@@ -99,14 +100,14 @@ export function RasterProcessingPanel({ scene, zones, onProcessed }: { scene: Re
       {runs.length > 1 && <details className="raster-history"><summary>Histórico de processamentos ({runs.length})</summary>{runs.map(run => <div key={run.id}><Badge tone={statusTone(run.status)}>{statusLabel(run.status)}</Badge><span>{run.customProductName || run.productType} · banda {run.band}</span><small>{new Date(run.requestedAtUtc).toLocaleString('pt-BR')}</small></div>)}</details>}
     </>}
 
-    <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Processar raster" description="O asset precisa estar acessível ao AgroControl Intelligence. A repetição da mesma configuração é idempotente.">
+    <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Processar raster" description="O AgroControl processa somente o asset registrado na cena selecionada. A repetição da mesma configuração e contexto espacial é idempotente.">
       <form className="raster-form" onSubmit={submit}>
         <label>Produto<select name="productType" defaultValue="NDVI"><option>NDVI</option><option>NDRE</option><option>EVI</option><option>Custom</option></select></label>
         <label>Nome customizado<input name="customProductName" placeholder="Somente para Custom" /></label>
         <label>Banda<input name="band" type="number" min="1" max="128" defaultValue="1" required /></label>
-        <label className="raster-form__wide">Asset raster<input name="assetReference" defaultValue={scene.assetReference ?? ''} placeholder="/data/scene.tif ou COG autorizado" /></label>
+        <div className="raster-form__wide"><span className="eyebrow">Asset da cena</span><p className="raster-panel__note">{scene.assetReference ?? 'Nenhum asset registrado.'}</p></div>
         <label className="raster-check"><input name="includeManagementZones" type="checkbox" defaultChecked /> Incluir zonas de manejo ativas</label>
-        <div className="raster-form__actions"><Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancelar</Button><Button type="submit" disabled={processing}>{processing ? 'Processando…' : 'Executar processamento'}</Button></div>
+        <div className="raster-form__actions"><Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancelar</Button><Button type="submit" disabled={processing || !scene.assetReference}>{processing ? 'Processando…' : 'Executar processamento'}</Button></div>
       </form>
     </Modal>
   </Card>;
