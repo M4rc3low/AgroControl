@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Button, Card, EmptyState, Modal, PageHeader, Spinner } from '../components/Ui';
 import { Icon } from '../components/Icon';
 import { buildSeriesPath, formatIndexValue, groupRemoteSensingSeries } from '../features/precision/remoteSensing';
+import { RasterProcessingPanel } from '../features/precision/RasterProcessingPanel';
 import { apiRequest, getAllPaged } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import type {
@@ -218,6 +219,8 @@ export function RemoteSensingPage() {
     <PageHeader eyebrow="Agricultura de precisão" title="Sensoriamento remoto e índices vegetativos" description="Acompanhe cenas de satélite ou drone, NDVI/NDRE/EVI e sua evolução temporal com fonte e data rastreáveis." actions={<><Link className="button button--ghost" to="/precision"><Icon name="map" size={16} /> Mapas e zonas</Link><Button variant="secondary" onClick={() => void loadRemote()}><Icon name="refresh" size={16} /> Atualizar</Button><Button onClick={() => setSceneModal(true)}>Nova cena</Button><Button onClick={() => setObservationModal(true)} disabled={!scenes.length}>Novo índice</Button></>} />
     <div className="remote-disclaimer">NDVI, NDRE e EVI são indicadores de sensoriamento remoto para apoio à decisão. Eles não constituem diagnóstico agronômico automático.</div>
     {error && <div className="context-error"><span>{error}</span></div>}
+
+    <RasterProcessingPanel scene={selectedScene} zones={zones} onProcessed={loadRemote} />
 
     <Card className="remote-filters">
       <label>Talhão<select value={fieldId} onChange={event => setFieldId(event.target.value)}><option value="">Selecione</option>{fields.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>

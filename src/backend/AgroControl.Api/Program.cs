@@ -56,6 +56,7 @@ builder.Services.AddScoped<MarketService>();
 builder.Services.AddScoped<IntelligenceService>();
 builder.Services.AddScoped<PrecisionAgricultureService>();
 builder.Services.AddScoped<RemoteSensingService>();
+builder.Services.AddScoped<RasterProcessingService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 if (builder.Configuration.GetValue<bool>("Observability:Enabled"))
@@ -105,7 +106,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.16.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.17.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {

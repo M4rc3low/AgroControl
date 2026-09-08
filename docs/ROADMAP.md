@@ -239,6 +239,26 @@
 - [x] testes unitários, integração PostgreSQL/PostGIS e testes frontend;
 - [x] documentação `SPRINT_16_REMOTE_SENSING.md` e versão API `0.16.0`.
 
+## Sprint 17 — Processamento raster e estatísticas zonais 🚀
+
+- [x] Rasterio + NumPy no AgroControl Intelligence;
+- [x] leitura de GeoTIFF/COG e metadados de CRS, dimensão, resolução e NoData;
+- [x] reprojeção das geometrias para o CRS do raster;
+- [x] máscara espacial e exclusão de NoData/valores não finitos;
+- [x] mínimo, máximo, média, mediana, desvio-padrão, cobertura válida e amostras;
+- [x] processamento do talhão e das zonas de manejo ativas;
+- [x] limites MVP de 20 milhões de pixels e 250 alvos;
+- [x] assets remotos desabilitados por padrão e validação de referências inseguras;
+- [x] produtos raster, execuções e resultados zonais isolados por `OrganizationId`;
+- [x] lifecycle `Pending`, `Processing`, `Succeeded` e `Failed`;
+- [x] idempotência por chave de processamento e tratamento de corrida concorrente;
+- [x] integração HTTP C# ↔ Python com timeout e indisponibilidade explícitos;
+- [x] endpoints de processamento, histórico de execuções e resultados;
+- [x] painel web dentro do workspace de sensoriamento remoto;
+- [x] migration `20260908154500_RasterProcessingCore`;
+- [x] testes Python com raster sintético e testes C# de domínio/persistência/contrato;
+- [x] documentação `SPRINT_17_RASTER_PROCESSING.md` e versão API `0.17.0`.
+
 ## Próximos aprimoramentos
 
-O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para processamento raster no AgroControl Intelligence/Python, estatística zonal sobre talhões e zonas de manejo, integração com provedores de imagens, máscaras de qualidade/nuvem, importação KML/Shapefile e aprofundamento agronômico, mantendo essas responsabilidades separadas do monólito transacional.
+O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para catálogo STAC e descoberta de cenas, ingestão assíncrona de assets, máscaras de qualidade/nuvem, geração de produtos a partir de bandas brutas, importação KML/Shapefile e aprofundamento agronômico, mantendo essas responsabilidades separadas do monólito transacional.

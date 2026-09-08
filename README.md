@@ -1,8 +1,8 @@
 # AgroControl
 
-**AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
+**AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência e processamento científico, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 16 concluída — sensoriamento remoto, cenas de satélite/drone e índices NDVI/NDRE/EVI**
+> Status atual: **Sprint 17 concluída em desenvolvimento — processamento raster, GeoTIFF/COG e estatísticas zonais por talhão e zona de manejo**
 
 ## Objetivo
 
@@ -13,6 +13,7 @@ Hoje o AgroControl cobre:
 - propriedades, talhões, culturas e safras;
 - limites geográficos, GeoJSON, PostGIS e zonas de manejo;
 - cenas de satélite/drone, footprints e índices vegetativos;
+- processamento raster com Rasterio/NumPy e estatísticas zonais;
 - estoque e movimentações de insumos;
 - custos, receitas e rentabilidade;
 - máquinas, horímetro, combustível e manutenção;
@@ -33,7 +34,7 @@ Os módulos são liberados por plano e o bloqueio é validado no backend, não a
 | Web | React 19 + TypeScript 7 + Vite 8 |
 | API principal | C# + ASP.NET Core / .NET 10 |
 | Banco principal | PostgreSQL 17 + PostGIS + Entity Framework Core |
-| Inteligência | Python 3.12 + FastAPI + scikit-learn |
+| Inteligência | Python 3.12 + FastAPI + scikit-learn + Rasterio + NumPy |
 | Telemetria / IoT | Java 21 + Spring Boot |
 | Banco de telemetria | PostgreSQL dedicado |
 | Mensageria IoT | MQTT + Eclipse Mosquitto |
@@ -51,7 +52,7 @@ flowchart TB
     BROWSER[Navegador] --> WEB[AgroControl Web\nReact + TypeScript + Nginx]
     WEB --> API[AgroControl API\nC# / ASP.NET Core]
     API --> DB[(PostgreSQL + PostGIS Core)]
-    API --> AI[AgroControl Intelligence\nPython / FastAPI]
+    API --> AI[AgroControl Intelligence\nPython / FastAPI / Rasterio]
     API --> TEL[AgroControl Telemetry\nJava / Spring Boot]
     TEL --> TDB[(PostgreSQL Telemetry)]
     SENSORS[Sensores / GPS / Estações / Máquinas] --> MQTT[MQTT / Mosquitto]
@@ -66,7 +67,7 @@ flowchart TB
     TEMPO --> GRAFANA
 ```
 
-A API concentra identidade, assinatura, autorização, `OrganizationId` e regras transacionais. Python é reservado para análise/modelagem e para evoluções de processamento científico. Java é usado para ingestão e histórico de telemetria. O banco principal não recebe raster pesado de satélite/drone: guarda metadados, footprints, referências de assets e estatísticas processadas.
+A API concentra identidade, assinatura, autorização, `OrganizationId` e regras transacionais. Python é reservado para análise/modelagem e processamento científico. Java é usado para ingestão e histórico de telemetria. O banco principal não recebe raster pesado de satélite/drone: guarda metadados, referências de assets, lifecycle de processamento e estatísticas derivadas.
 
 ## Funcionalidades implementadas
 
@@ -79,6 +80,7 @@ A API concentra identidade, assinatura, autorização, `OrganizationId` e regras
 - CRUD de produção rural;
 - Agricultura de Precisão com MapLibre, limites e zonas de manejo;
 - workspace de sensoriamento remoto com cenas, filtros, linha do tempo, footprints, latest metrics e gráficos temporais;
+- painel de processamento raster com disparo, status, metadados e comparação entre talhão e zonas;
 - irrigação, sustentabilidade, exportação e Comercial/CRM;
 - estados de loading, vazio, erro e módulo bloqueado;
 - proxy reverso same-origin no Nginx.
@@ -115,7 +117,7 @@ O frontend melhora a experiência, mas **não substitui as validações de autor
 - exportação `FeatureCollection`;
 - camadas MapLibre com pré-visualização e controle de visibilidade.
 
-### Sensoriamento remoto
+### Sensoriamento remoto e raster
 
 - cenas `Satellite`, `Drone` e `Other`;
 - Field obrigatório e Season opcional, sempre no mesmo tenant;
@@ -129,11 +131,18 @@ O frontend melhora a experiência, mas **não substitui as validações de autor
 - snapshot de fonte e data da cena em cada observação;
 - séries temporais por talhão, safra, zona e índice;
 - resumo com índice mais recente e contagem de cenas;
-- rota web `/precision/remote-sensing` com cards, timeline, gráfico temporal e mapa do footprint.
+- rota web `/precision/remote-sensing` com cards, timeline, gráfico temporal, mapa e processamento raster;
+- motor Python com Rasterio + NumPy para GeoTIFF/COG;
+- reprojeção de geometrias, máscara, NoData e estatísticas zonais;
+- processamento do talhão e das zonas de manejo ativas;
+- lifecycle `Pending`, `Processing`, `Succeeded` e `Failed`;
+- idempotência por chave de processamento e persistência transacional;
+- limites MVP de 20 milhões de pixels e 250 geometrias por processamento;
+- assets remotos desabilitados por padrão e validações contra referências inseguras.
 
 NDVI, NDRE e EVI são **indicadores de sensoriamento remoto para apoio à decisão**. O AgroControl não os transforma automaticamente em diagnóstico de doença, praga, deficiência nutricional, estresse hídrico ou produtividade.
 
-O raster pesado permanece fora do PostgreSQL principal. A evolução para processamento de bandas, máscaras e estatística zonal deve usar uma camada especializada, preferencialmente o AgroControl Intelligence/Python.
+O raster pesado permanece fora do PostgreSQL principal. O serviço Python calcula os resultados científicos, enquanto a API C# mantém autorização, contexto produtivo, `OrganizationId`, idempotência e persistência.
 
 ### Estoque e financeiro
 
@@ -159,9 +168,12 @@ O raster pesado permanece fora do PostgreSQL principal. A evolução para proces
 - regressão Ridge;
 - MAE/RMSE quando existe histórico suficiente;
 - retorno `insufficient_data` quando não há base confiável;
-- cliente HTTP C# com timeout e isolamento multi-tenant.
+- Rasterio + NumPy para estatísticas zonais;
+- GeoTIFF/COG, reprojeção de CRS, máscara e NoData;
+- contrato interno `POST /api/v1/raster/zonal-statistics`;
+- cliente HTTP C# com timeout e tratamento de indisponibilidade.
 
-A previsão é apoio à decisão e não garantia de produtividade.
+A previsão e os produtos raster são apoio à decisão e não garantia de produtividade ou diagnóstico agronômico automático.
 
 ### AgroControl Telemetry
 
@@ -263,6 +275,9 @@ GET  /api/v1/platform/entitlements
 /api/v1/seasons
 /api/v1/precision/*
 /api/v1/precision/remote-sensing/*
+POST /api/v1/precision/remote-sensing/scenes/{sceneId}/process
+GET  /api/v1/precision/remote-sensing/scenes/{sceneId}/processings
+GET  /api/v1/precision/remote-sensing/processing-results
 /api/v1/irrigation/*
 /api/v1/sustainability/*
 /api/v1/export/*
@@ -312,6 +327,7 @@ Segredos reais não entram no repositório.
 - [`docs/SPRINT_14_COMMERCIAL.md`](docs/SPRINT_14_COMMERCIAL.md)
 - [`docs/SPRINT_15_GEOSPATIAL_ZONES.md`](docs/SPRINT_15_GEOSPATIAL_ZONES.md)
 - [`docs/SPRINT_16_REMOTE_SENSING.md`](docs/SPRINT_16_REMOTE_SENSING.md)
+- [`docs/SPRINT_17_RASTER_PROCESSING.md`](docs/SPRINT_17_RASTER_PROCESSING.md)
 
 ## Roadmap resumido
 
@@ -332,6 +348,7 @@ Segredos reais não entram no repositório.
 15. ✅ Sprint 14 — Comercial/CRM.
 16. ✅ Sprint 15 — importação GeoJSON e zonas de manejo.
 17. ✅ Sprint 16 — sensoriamento remoto e índices vegetativos.
+18. 🚀 Sprint 17 — processamento raster e estatísticas zonais.
 
 O hardening dependente de ambiente real, política operacional ou testes de carga permanece separado no issue **#18**.
 
@@ -340,6 +357,8 @@ O hardening dependente de ambiente real, política operacional ou testes de carg
 Defaults do repositório são apenas de desenvolvimento. Em produção, `JWT_KEY`, `TELEMETRY_INTERNAL_API_KEY`, credenciais de banco e credenciais/certificados MQTT devem vir de secrets management apropriado.
 
 O mapa usa URLs configuráveis. Credenciais de provedores de tiles/imagens não devem ser tratadas como segredo confiável quando expostas ao navegador. Integrações futuras com provedores autenticados devem manter segredos no backend/secret manager.
+
+Assets raster remotos permanecem desabilitados por padrão no Intelligence. Quando habilitados, devem ser combinados em produção com allowlists, egress control e credenciais gerenciadas; referências remotas não devem transportar credenciais na URL.
 
 O JWT do frontend usa `sessionStorage` por compatibilidade com o contrato bearer atual. A evolução para BFF/cookie HttpOnly pode ser adotada quando o modelo de exposição pública justificar esse endurecimento.
 

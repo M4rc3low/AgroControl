@@ -43,6 +43,33 @@ public static class RemoteSensingEndpoints
             return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
         });
 
+        group.MapPost("/scenes/{sceneId:guid}/process", async (Guid sceneId, ProcessRasterSceneCommand command,
+            ClaimsPrincipal user, RasterProcessingService service, CancellationToken ct) =>
+        {
+            var result = await service.ProcessSceneAsync(GetOrganizationId(user), sceneId, command, ct);
+            return result.Kind switch
+            {
+                RasterProcessResultKind.Success => Results.Ok(result.Value),
+                RasterProcessResultKind.Validation => Results.ValidationProblem(new Dictionary<string, string[]> { ["raster"] = [result.Error ?? "Invalid raster-processing request."] }),
+                RasterProcessResultKind.NotFound => Results.NotFound(new { message = result.Error }),
+                RasterProcessResultKind.Conflict => Results.Conflict(new { message = result.Error }),
+                RasterProcessResultKind.Timeout => Results.Problem(statusCode: 504, title: "Raster processing timed out", detail: result.Error),
+                RasterProcessResultKind.Unavailable => Results.Problem(statusCode: 503, title: "Raster processing unavailable", detail: result.Error),
+                _ => Results.Problem(statusCode: 500, title: "Raster processing failed", detail: result.Error)
+            };
+        });
+
+        group.MapGet("/scenes/{sceneId:guid}/processings", async (Guid sceneId, ClaimsPrincipal user,
+            RasterProcessingService service, CancellationToken ct) =>
+            Results.Ok(await service.ListRunsAsync(GetOrganizationId(user), sceneId, ct)));
+
+        group.MapGet("/processing-results", async (ClaimsPrincipal user, RasterProcessingService service,
+            int page = 1, int pageSize = 50, Guid? fieldId = null, Guid? seasonId = null,
+            Guid? managementZoneId = null, string? indexType = null, DateTime? fromUtc = null, DateTime? toUtc = null,
+            CancellationToken ct = default) =>
+            Results.Ok(await service.ListResultsAsync(GetOrganizationId(user), page, pageSize, fieldId, seasonId,
+                managementZoneId, indexType, fromUtc, toUtc, ct)));
+
         group.MapGet("/observations", async (ClaimsPrincipal user, RemoteSensingService service, int page = 1, int pageSize = 50,
             Guid? sceneId = null, Guid? fieldId = null, Guid? seasonId = null, Guid? managementZoneId = null,
             string? indexType = null, DateTime? fromUtc = null, DateTime? toUtc = null, CancellationToken ct = default) =>
