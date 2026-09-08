@@ -10,9 +10,11 @@ describe('format helpers', () => {
     expect(formatDate('2026-09-07')).toBe('07/09/2026');
   });
 
-  it('converts the same UTC instant using the farm timezone', () => {
+  it('converts the same UTC instant using operational farm timezones in SP, MT, AM and AC', () => {
     const instant = '2026-09-08T15:00:00Z';
     expect(formatDateTimeInTimeZone(instant, 'America/Sao_Paulo')).toContain('12:00');
+    expect(formatDateTimeInTimeZone(instant, 'America/Cuiaba')).toContain('11:00');
+    expect(formatDateTimeInTimeZone(instant, 'America/Manaus')).toContain('11:00');
     expect(formatDateTimeInTimeZone(instant, 'America/Rio_Branco')).toContain('10:00');
   });
 
