@@ -31,7 +31,7 @@ A propriedade mantém compatibilidade com `City` e `State` e acrescenta:
 - `OperationalRegionId` opcional;
 - timezone IANA por propriedade.
 
-O cadastro valida UF brasileira, coordenadas e timezone conhecido. Dados antigos são migrados com `BR`, UF derivada do estado existente quando possível e `America/Sao_Paulo` como fallback de compatibilidade; esse fallback deve ser revisado em propriedades localizadas em outros fusos.
+O cadastro valida UF brasileira, coordenadas e timezone conhecido. Dados antigos são migrados inicialmente com `BR`, UF derivada do estado existente quando possível e `America/Sao_Paulo` como fallback de compatibilidade. A migration de hardening `20260908193000_MultiFarmTimezoneBackfillHardening` corrige automaticamente o fallback para MT, MS, AM, AC, RO e RR quando a UF está disponível. Propriedades do Amazonas que operem no fuso ocidental ou registros sem UF normalizada continuam podendo receber `TimeZoneId` explicitamente.
 
 ## Autorização horizontal
 
@@ -58,7 +58,9 @@ O filtro operacional cobre, conforme a relação de domínio:
 - ExportOrder e seus documentos, custos e eventos de status;
 - CommercialOpportunity e histórico de estágio.
 
-Registros genuinamente organizacionais sem `FarmId`, quando o domínio permite esse conceito, continuam visíveis no tenant. Eles não são atribuídos artificialmente a uma fazenda.
+Registros genuinamente organizacionais sem vínculo com uma propriedade, quando o domínio permite esse conceito, continuam visíveis no tenant. Eles não são atribuídos artificialmente a uma fazenda.
+
+Além dos filtros, as operações de escrita normalizam e validam referências Farm/Field/Season no mesmo tenant. IDs de uma propriedade fora do escopo não devem ser usados para inferir existência de recursos de outra fazenda.
 
 ## SQL espacial e raster
 
@@ -90,9 +92,9 @@ Fazenda
 
 `Todas as fazendas` só é oferecido como contexto global quando o escopo efetivo contém `AllFarms`. A seleção é UX; a segurança continua no backend.
 
-O dashboard usa o contexto selecionado para propriedades, talhões, safras e resumo financeiro. O mapa MapLibre mostra apenas propriedades acessíveis que possuem coordenadas e permite entrar diretamente em uma fazenda.
+O dashboard usa o contexto selecionado para propriedades, talhões, safras e resumo financeiro. O mapa MapLibre mostra apenas propriedades acessíveis que possuem coordenadas, ajusta o enquadramento às propriedades visíveis e permite entrar diretamente em uma fazenda.
 
-A comparação por propriedade apresenta área, quantidade de talhões, safras ativas e produtividade realizada média quando disponível.
+A comparação por propriedade apresenta apenas métricas que podem ser comparadas com segurança no contexto atual: área, quantidade de talhões, safras ativas e safras concluídas. Produtividade não é agregada entre safras sem que a unidade seja explicitamente compatível.
 
 ## Fusos horários
 
@@ -100,7 +102,7 @@ Datas técnicas continuam armazenadas em UTC. A propriedade informa o timezone I
 
 Em consolidações de várias propriedades, timestamps continuam comparáveis em UTC e o sistema não finge que todo o grupo possui um único horário local.
 
-Exemplos brasileiros suportados incluem `America/Sao_Paulo`, `America/Cuiaba`, `America/Manaus` e `America/Rio_Branco`.
+A suíte frontend valida explicitamente o mesmo instante UTC em `America/Sao_Paulo`, `America/Cuiaba`, `America/Manaus` e `America/Rio_Branco`, cobrindo o cenário operacional SP × MT × AM × AC.
 
 ## Financeiro consolidado
 
@@ -126,15 +128,38 @@ GET    /api/v1/farms?regionId=&stateCode=
 
 A gestão de regiões e permissões exige papel administrativo apropriado. A consulta do próprio escopo fica disponível ao usuário autenticado.
 
-## Migration
+## Migrations
 
-A migration oficial é:
+A migration estrutural da Sprint 18 é:
 
 ```text
 20260908173917_MultiFarmRegionalOperations
 ```
 
 Ela cria `operational_regions`, `farm_access_assignments`, amplia `farms`, cria índices e executa o backfill compatível com os registros existentes.
+
+O hardening de timezone acrescenta:
+
+```text
+20260908193000_MultiFarmTimezoneBackfillHardening
+```
+
+Essa migration corrige os timezones operacionais de UFs brasileiras fora do horário de Brasília quando o registro legado ainda conserva o fallback `America/Sao_Paulo`. O `Down` não reverte dados para evitar sobrescrever correções explícitas feitas depois da migração.
+
+## Matriz de segurança horizontal
+
+A validação automatizada usa uma organização com duas propriedades, Fazenda A e Fazenda B, e um usuário cujo escopo efetivo contém somente A.
+
+Os testes existentes cobrem Financeiro, Agricultura de Precisão, Sensoriamento Remoto e Raster. O hardening final acrescenta uma matriz explícita para:
+
+- Estoque;
+- Máquinas;
+- Irrigação;
+- Sustentabilidade;
+- Exportação;
+- Comercial.
+
+A matriz verifica listagem e tentativa de acesso direto por ID. Exportação e Comercial também verificam entidades-filhas para impedir vazamento indireto por documentos, eventos ou históricos ligados à Fazenda B.
 
 ## Segurança
 
@@ -145,9 +170,21 @@ O desenho adota defesa em profundidade:
 3. EF Core aplica query filters nos módulos relacionais;
 4. repositórios SQL/PostGIS aplicam a restrição explicitamente;
 5. Telemetry valida o vínculo na API C# antes de acessar o serviço Java;
-6. IDs fora do escopo são tratados como não encontrados sempre que possível para reduzir enumeração.
+6. IDs fora do escopo são tratados como não encontrados sempre que possível para reduzir enumeração;
+7. testes A × B na mesma organização verificam a autorização horizontal nos módulos vinculados a fazenda.
 
 O seletor da Web jamais é tratado como mecanismo de autorização.
+
+## Critério de fechamento
+
+Implementação funcional não encerra a Sprint por si só. A Sprint 18 só deve ser considerada concluída quando o pull request contra `main` tiver passado, no mesmo head revisado, pelos gates aplicáveis:
+
+- Backend CI;
+- Frontend CI;
+- Platform CI;
+- CodeQL.
+
+Falha em qualquer gate mantém a Sprint aberta. O merge final deve ser `squash`, e a Issue #50 só deve ser encerrada após o merge aprovado pelos checks.
 
 ## Fora do escopo
 
