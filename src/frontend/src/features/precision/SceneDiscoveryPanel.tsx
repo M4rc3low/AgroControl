@@ -7,6 +7,7 @@ import type {
   RemoteSceneDiscoveryProvider,
   RemoteSensingScene
 } from '../../lib/types';
+import { discoveryImportKey, rasterCandidates } from './sceneDiscovery';
 import './SceneDiscoveryPanel.css';
 
 interface Props {
@@ -97,7 +98,7 @@ export function SceneDiscoveryPanel({ fieldId, seasonId, onImported, onPreview }
   }
 
   async function importAsset(item: RemoteSceneDiscoveryItem, assetKey: string) {
-    const operationKey = `${item.provider}:${item.externalId}:${assetKey}`;
+    const operationKey = discoveryImportKey(item, assetKey);
     setImporting(operationKey); setError(null);
     try {
       const scene = await apiRequest<RemoteSensingScene>('/api/v1/precision/remote-sensing/discovery/import', {
@@ -155,7 +156,7 @@ export function SceneDiscoveryPanel({ fieldId, seasonId, onImported, onPreview }
     {!loading && page && page.items.length > 0 && <>
       <div className="scene-discovery__results">
         {page.items.map(item => {
-          const rasterAssets = item.assets.filter(asset => asset.isRasterCandidate);
+          const rasterAssets = rasterCandidates(item);
           return <article key={`${item.provider}:${item.collection}:${item.externalId}`} className="scene-discovery__item">
             <div className="scene-discovery__item-head">
               <div><strong>{item.externalId}</strong><small>{item.collection}</small></div>
@@ -170,7 +171,7 @@ export function SceneDiscoveryPanel({ fieldId, seasonId, onImported, onPreview }
             <div className="scene-discovery__actions">
               <Button variant="secondary" type="button" onClick={() => onPreview(item)} disabled={!item.geometryGeoJson}>Ver footprint</Button>
               {rasterAssets.map(asset => {
-                const key = `${item.provider}:${item.externalId}:${asset.key}`;
+                const key = discoveryImportKey(item, asset.key);
                 const done = imported.has(key);
                 return <Button key={asset.key} type="button" disabled={done || importing === key} onClick={() => void importAsset(item, asset.key)}>
                   {done ? `Importado: ${asset.key}` : importing === key ? 'Importando…' : `Importar ${asset.key}`}
