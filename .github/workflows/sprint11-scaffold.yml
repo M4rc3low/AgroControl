@@ -52,6 +52,8 @@ jobs:
           PY
       - name: Restore
         run: dotnet restore AgroControl.sln
+      - name: Build debug for EF
+        run: dotnet build AgroControl.sln --configuration Debug --no-restore
       - name: Install EF tool
         run: dotnet tool install --global dotnet-ef --version 10.0.0
       - name: Generate IrrigationCore migration
