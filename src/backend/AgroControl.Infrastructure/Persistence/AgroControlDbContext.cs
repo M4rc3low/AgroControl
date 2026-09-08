@@ -1,3 +1,4 @@
+using AgroControl.Application.RegionalOperations;
 using AgroControl.Domain.Modules.Crops;
 using AgroControl.Domain.Modules.Commercial;
 using AgroControl.Domain.Modules.Exporting;
@@ -10,6 +11,7 @@ using AgroControl.Domain.Modules.Irrigation;
 using AgroControl.Domain.Modules.Machinery;
 using AgroControl.Domain.Modules.Market;
 using AgroControl.Domain.Modules.Organizations;
+using AgroControl.Domain.Modules.Operations;
 using AgroControl.Domain.Modules.Seasons;
 using AgroControl.Domain.Modules.Subscriptions;
 using AgroControl.Domain.Modules.Sustainability;
@@ -17,11 +19,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AgroControl.Infrastructure.Persistence;
 
-public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> options) : DbContext(options)
+public sealed class AgroControlDbContext(
+    DbContextOptions<AgroControlDbContext> options,
+    IOperationalScopeContext? operationalScope = null) : DbContext(options)
 {
+    private bool RestrictFarmScope => operationalScope is { IsInitialized: true, IsRestricted: true };
+    private Guid[] ScopedFarmIds => operationalScope?.FarmIds.ToArray() ?? [];
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<User> Users => Set<User>();
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
+    public DbSet<OperationalRegion> OperationalRegions => Set<OperationalRegion>();
+    public DbSet<FarmAccessAssignment> FarmAccessAssignments => Set<FarmAccessAssignment>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<OrganizationModuleEntitlement> OrganizationModuleEntitlements => Set<OrganizationModuleEntitlement>();
     public DbSet<Farm> Farms => Set<Farm>();
@@ -76,6 +84,29 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade); entity.HasIndex(x => x.UserId);
         });
+        modelBuilder.Entity<OperationalRegion>(entity =>
+        {
+            entity.ToTable("operational_regions"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.Code).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Code }).IsUnique();
+            entity.HasIndex(x => new { x.OrganizationId, x.IsActive });
+        });
+        modelBuilder.Entity<FarmAccessAssignment>(entity =>
+        {
+            entity.ToTable("farm_access_assignments"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.ScopeType).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.ScopeKey).HasMaxLength(100).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.TargetId);
+            entity.HasIndex(x => new { x.OrganizationId, x.UserId, x.ScopeKey }).IsUnique().HasFilter("\"IsActive\" = TRUE");
+        });
         modelBuilder.Entity<Subscription>(entity =>
         {
             entity.ToTable("subscriptions"); entity.HasKey(x => x.Id);
@@ -90,11 +121,29 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<Farm>(entity =>
         {
-            entity.ToTable("farms"); entity.HasKey(x => x.Id); entity.Property(x => x.Name).HasMaxLength(160).IsRequired(); entity.Property(x => x.TotalAreaHectares).HasPrecision(18, 4).IsRequired(); entity.Property(x => x.City).HasMaxLength(120); entity.Property(x => x.State).HasMaxLength(80);
-            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => new { x.OrganizationId, x.Name });
+            entity.HasQueryFilter(x => !RestrictFarmScope || ScopedFarmIds.Contains(x.Id));
+            entity.ToTable("farms"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.TotalAreaHectares).HasPrecision(18, 4).IsRequired();
+            entity.Property(x => x.City).HasMaxLength(120);
+            entity.Property(x => x.State).HasMaxLength(80);
+            entity.Property(x => x.CountryCode).HasMaxLength(2).IsRequired();
+            entity.Property(x => x.StateCode).HasMaxLength(2);
+            entity.Property(x => x.MunicipalityCode).HasMaxLength(24);
+            entity.Property(x => x.PostalCode).HasMaxLength(20);
+            entity.Property(x => x.Latitude).HasPrecision(9, 6);
+            entity.Property(x => x.Longitude).HasPrecision(9, 6);
+            entity.Property(x => x.TimeZoneId).HasMaxLength(80).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<OperationalRegion>().WithMany().HasForeignKey(x => x.OperationalRegionId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => x.OperationalRegionId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Name });
+            entity.HasIndex(x => new { x.OrganizationId, x.CountryCode, x.StateCode });
         });
         modelBuilder.Entity<Field>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || ScopedFarmIds.Contains(x.FarmId));
             entity.ToTable("fields"); entity.HasKey(x => x.Id); entity.Property(x => x.Name).HasMaxLength(160).IsRequired(); entity.Property(x => x.AreaHectares).HasPrecision(18, 4).IsRequired();
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict); entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.FarmId); entity.HasIndex(x => new { x.OrganizationId, x.Name });
         });
@@ -105,6 +154,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<Season>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || Fields.Any(field => field.Id == x.FieldId && ScopedFarmIds.Contains(field.FarmId)));
             entity.ToTable("seasons"); entity.HasKey(x => x.Id); entity.Property(x => x.Name).HasMaxLength(120).IsRequired(); entity.Property(x => x.ExpectedYieldPerHectare).HasPrecision(18, 4); entity.Property(x => x.ActualYieldPerHectare).HasPrecision(18, 4); entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Crop>().WithMany().HasForeignKey(x => x.CropId).OnDelete(DeleteBehavior.Restrict); entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.FieldId); entity.HasIndex(x => x.CropId); entity.HasIndex(x => new { x.OrganizationId, x.Status });
         });
@@ -120,11 +170,13 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<Warehouse>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value));
             entity.ToTable("warehouses"); entity.HasKey(x => x.Id); entity.Property(x => x.Name).HasMaxLength(160).IsRequired(); entity.Property(x => x.Location).HasMaxLength(240);
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict); entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.FarmId); entity.HasIndex(x => new { x.OrganizationId, x.Name });
         });
         modelBuilder.Entity<StockMovement>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || (x.FarmId != null && ScopedFarmIds.Contains(x.FarmId.Value)) || (x.FarmId == null && Warehouses.Any(warehouse => warehouse.Id == x.WarehouseId && (warehouse.FarmId == null || ScopedFarmIds.Contains(warehouse.FarmId.Value)))));
             entity.ToTable("stock_movements"); entity.HasKey(x => x.Id); entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired(); entity.Property(x => x.Quantity).HasPrecision(18, 4).IsRequired(); entity.Property(x => x.BatchNumber).HasMaxLength(120); entity.Property(x => x.Notes).HasMaxLength(1000); entity.Ignore(x => x.SignedQuantity);
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasOne<InventoryItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict); entity.HasOne<Season>().WithMany().HasForeignKey(x => x.SeasonId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.ItemId); entity.HasIndex(x => x.WarehouseId); entity.HasIndex(x => new { x.OrganizationId, x.ItemId, x.WarehouseId, x.OccurredAtUtc }); entity.HasIndex(x => x.BatchNumber);
@@ -141,6 +193,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<FinancialTransaction>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value));
             entity.ToTable("financial_transactions"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired();
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
@@ -165,6 +218,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<Machine>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value));
             entity.ToTable("machines"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
             entity.Property(x => x.InternalCode).HasMaxLength(80).IsRequired();
@@ -182,6 +236,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<HourMeterReading>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || Machines.Any(machine => machine.Id == x.MachineId && (machine.FarmId == null || ScopedFarmIds.Contains(machine.FarmId.Value))));
             entity.ToTable("machine_hour_meter_readings"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Hours).HasPrecision(18, 2).IsRequired();
             entity.Property(x => x.Notes).HasMaxLength(1000);
@@ -192,6 +247,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<Fueling>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || Machines.Any(machine => machine.Id == x.MachineId && (machine.FarmId == null || ScopedFarmIds.Contains(machine.FarmId.Value))));
             entity.ToTable("machine_fuelings"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Liters).HasPrecision(18, 3).IsRequired();
             entity.Property(x => x.TotalCost).HasPrecision(18, 2).IsRequired();
@@ -205,6 +261,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<MaintenanceRecord>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || Machines.Any(machine => machine.Id == x.MachineId && (machine.FarmId == null || ScopedFarmIds.Contains(machine.FarmId.Value))));
             entity.ToTable("machine_maintenance_records"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Kind).HasConversion<string>().HasMaxLength(32).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(240).IsRequired();
@@ -256,6 +313,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<IrrigationZone>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || Fields.Any(field => field.Id == x.FieldId && ScopedFarmIds.Contains(field.FarmId)));
             entity.ToTable("irrigation_zones"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
             entity.Property(x => x.AreaHectares).HasPrecision(18, 4).IsRequired();
@@ -270,6 +328,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<IrrigationApplication>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || Fields.Any(field => field.Id == x.FieldId && ScopedFarmIds.Contains(field.FarmId)));
             entity.ToTable("irrigation_applications"); entity.HasKey(x => x.Id);
             entity.Property(x => x.AreaHectaresSnapshot).HasPrecision(18, 4).IsRequired();
             entity.Property(x => x.DepthMillimeters).HasPrecision(18, 3).IsRequired();
@@ -298,6 +357,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<EmissionActivity>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value));
             entity.ToTable("emission_activities"); entity.HasKey(x => x.Id);
             entity.Property(x => x.FactorNameSnapshot).HasMaxLength(160).IsRequired();
             entity.Property(x => x.CategorySnapshot).HasConversion<string>().HasMaxLength(32).IsRequired();
@@ -326,6 +386,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<ExportOrder>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value));
             entity.ToTable("export_orders"); entity.HasKey(x => x.Id);
             entity.Property(x => x.OrderNumber).HasMaxLength(80).IsRequired();
             entity.Property(x => x.BuyerName).HasMaxLength(200).IsRequired();
@@ -359,6 +420,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<ExportDocument>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || ExportOrders.Any(order => order.Id == x.OrderId));
             entity.ToTable("export_documents"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(48).IsRequired();
             entity.Property(x => x.CustomLabel).HasMaxLength(160);
@@ -372,6 +434,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<ExportCost>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || ExportOrders.Any(order => order.Id == x.OrderId));
             entity.ToTable("export_costs"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(240).IsRequired();
@@ -387,6 +450,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<ExportOrderStatusEvent>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || ExportOrders.Any(order => order.Id == x.OrderId));
             entity.ToTable("export_order_status_events"); entity.HasKey(x => x.Id);
             entity.Property(x => x.FromStatus).HasConversion<string>().HasMaxLength(32);
             entity.Property(x => x.ToStatus).HasConversion<string>().HasMaxLength(32).IsRequired();
@@ -428,6 +492,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<CommercialOpportunity>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || x.FarmId == null || ScopedFarmIds.Contains(x.FarmId.Value));
             entity.ToTable("commercial_opportunities"); entity.HasKey(x => x.Id);
             entity.Property(x => x.Title).HasMaxLength(240).IsRequired();
             entity.Property(x => x.ExpectedValue).HasPrecision(18, 2).IsRequired();
@@ -451,6 +516,7 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<OpportunityStageEvent>(entity =>
         {
+            entity.HasQueryFilter(x => !RestrictFarmScope || CommercialOpportunities.Any(opportunity => opportunity.Id == x.OpportunityId));
             entity.ToTable("commercial_opportunity_stage_events"); entity.HasKey(x => x.Id);
             entity.Property(x => x.FromStage).HasConversion<string>().HasMaxLength(32);
             entity.Property(x => x.ToStage).HasConversion<string>().HasMaxLength(32).IsRequired();

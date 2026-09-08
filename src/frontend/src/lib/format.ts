@@ -14,6 +14,25 @@ export function formatDate(value: string | null | undefined) {
   return new Intl.DateTimeFormat('pt-BR').format(date);
 }
 
+export function formatDateTimeInTimeZone(
+  value: string | Date | null | undefined,
+  timeZone: string,
+  options: Intl.DateTimeFormatOptions = {}) {
+  if (!value) return '—';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone,
+      dateStyle: 'short',
+      timeStyle: 'short',
+      ...options
+    }).format(date);
+  } catch {
+    return '—';
+  }
+}
+
 export function initials(value: string | null | undefined) {
   if (!value) return 'AC';
   return value

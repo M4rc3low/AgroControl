@@ -1,19 +1,20 @@
 using System.Data;
 using System.Data.Common;
 using AgroControl.Application.PrecisionAgriculture;
+using AgroControl.Application.RegionalOperations;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgroControl.Infrastructure.Persistence;
 
-public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IRemoteSensingRepository
+public sealed class RemoteSensingRepository(AgroControlDbContext dbContext, IOperationalScopeContext? operationalScope = null) : IRemoteSensingRepository
 {
     public async Task<(IReadOnlyList<RemoteSensingSceneSnapshot> Items, int TotalCount)> ListScenesAsync(
         Guid organizationId, int skip, int take, Guid? fieldId, Guid? seasonId, string? platform, string? provider,
         DateTime? fromUtc, DateTime? toUtc, bool includeInactive, CancellationToken cancellationToken = default)
     {
-        const string filter = """
+        var filter = $"""
             FROM remote_sensing_scenes AS s
-            WHERE s."OrganizationId" = @organizationId
+            WHERE s."OrganizationId" = @organizationId{SceneScopeSql("s")}
               AND (CAST(@fieldId AS uuid) IS NULL OR s."FieldId" = CAST(@fieldId AS uuid))
               AND (CAST(@seasonId AS uuid) IS NULL OR s."SeasonId" = CAST(@seasonId AS uuid))
               AND (CAST(@platform AS text) IS NULL OR s."Platform" = CAST(@platform AS text))
@@ -44,13 +45,13 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
 
     public Task<RemoteSensingSceneSnapshot?> GetSceneAsync(Guid organizationId, Guid sceneId, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             SELECT s."Id", s."FieldId", s."SeasonId", s."Provider", s."ExternalId", s."Platform", s."AcquiredAtUtc",
                    s."CloudCoveragePercent", s."SpatialResolutionMeters", s."AssetReference", s."Notes",
                    CASE WHEN s."Footprint" IS NULL THEN NULL ELSE ST_AsGeoJSON(s."Footprint"::geometry, 8, 0) END,
                    s."IsActive", s."CreatedAtUtc", s."UpdatedAtUtc"
             FROM remote_sensing_scenes AS s
-            WHERE s."OrganizationId" = @organizationId AND s."Id" = @sceneId;
+            WHERE s."OrganizationId" = @organizationId{SceneScopeSql("s")} AND s."Id" = @sceneId;
             """;
         return QuerySceneSingleAsync(sql, command =>
         {
@@ -60,7 +61,7 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
 
     public Task<RemoteSensingSceneSnapshot?> AddSceneAsync(Guid organizationId, RemoteSensingSceneWriteModel model, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             WITH candidate AS (
                 SELECT CASE WHEN CAST(@footprint AS text) IS NULL THEN NULL
                             ELSE ST_SetSRID(ST_GeomFromGeoJSON(CAST(@footprint AS text)), 4326) END AS geom
@@ -69,7 +70,7 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
                 FROM fields AS f
                 LEFT JOIN seasons AS se ON se."Id" = CAST(@seasonId AS uuid)
                 CROSS JOIN candidate
-                WHERE f."OrganizationId" = @organizationId AND f."Id" = @fieldId AND f."IsActive"
+                WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")} AND f."Id" = @fieldId AND f."IsActive"
                   AND (CAST(@seasonId AS uuid) IS NULL OR (se."OrganizationId" = @organizationId AND se."FieldId" = f."Id" AND se."IsActive"))
                   AND (candidate.geom IS NULL OR (ST_GeometryType(candidate.geom) = 'ST_Polygon' AND NOT ST_IsEmpty(candidate.geom) AND ST_IsValid(candidate.geom)))
             ), inserted AS (
@@ -94,7 +95,7 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
 
     public Task<RemoteSensingSceneSnapshot?> UpdateSceneAsync(Guid organizationId, RemoteSensingSceneWriteModel model, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             WITH candidate AS (
                 SELECT CASE WHEN CAST(@footprint AS text) IS NULL THEN NULL
                             ELSE ST_SetSRID(ST_GeomFromGeoJSON(CAST(@footprint AS text)), 4326) END AS geom
@@ -103,7 +104,7 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
                 FROM fields AS f
                 LEFT JOIN seasons AS se ON se."Id" = CAST(@seasonId AS uuid)
                 CROSS JOIN candidate
-                WHERE f."OrganizationId" = @organizationId AND f."Id" = @fieldId AND f."IsActive"
+                WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")} AND f."Id" = @fieldId AND f."IsActive"
                   AND (CAST(@seasonId AS uuid) IS NULL OR (se."OrganizationId" = @organizationId AND se."FieldId" = f."Id" AND se."IsActive"))
                   AND (candidate.geom IS NULL OR (ST_GeometryType(candidate.geom) = 'ST_Polygon' AND NOT ST_IsEmpty(candidate.geom) AND ST_IsValid(candidate.geom)))
             ), updated AS (
@@ -114,7 +115,7 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
                     "Notes" = @notes, "Footprint" = CASE WHEN candidate.geom IS NULL THEN NULL ELSE candidate.geom::geography END,
                     "UpdatedAtUtc" = @updatedAtUtc
                 FROM eligible CROSS JOIN candidate
-                WHERE s."OrganizationId" = @organizationId AND s."Id" = @id AND s."IsActive"
+                WHERE s."OrganizationId" = @organizationId{SceneScopeSql("s")} AND s."Id" = @id AND s."IsActive"
                 RETURNING s.*)
             SELECT u."Id", u."FieldId", u."SeasonId", u."Provider", u."ExternalId", u."Platform", u."AcquiredAtUtc",
                    u."CloudCoveragePercent", u."SpatialResolutionMeters", u."AssetReference", u."Notes",
@@ -127,10 +128,10 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
 
     public Task<RemoteSensingSceneSnapshot?> DeactivateSceneAsync(Guid organizationId, Guid sceneId, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             WITH updated AS (
                 UPDATE remote_sensing_scenes AS s SET "IsActive" = FALSE, "UpdatedAtUtc" = @updatedAtUtc
-                WHERE s."OrganizationId" = @organizationId AND s."Id" = @sceneId RETURNING s.*)
+                WHERE s."OrganizationId" = @organizationId{SceneScopeSql("s")} AND s."Id" = @sceneId RETURNING s.*)
             SELECT u."Id", u."FieldId", u."SeasonId", u."Provider", u."ExternalId", u."Platform", u."AcquiredAtUtc",
                    u."CloudCoveragePercent", u."SpatialResolutionMeters", u."AssetReference", u."Notes",
                    CASE WHEN u."Footprint" IS NULL THEN NULL ELSE ST_AsGeoJSON(u."Footprint"::geometry, 8, 0) END,
@@ -147,10 +148,10 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
         Guid organizationId, int skip, int take, Guid? sceneId, Guid? fieldId, Guid? seasonId, Guid? managementZoneId,
         string? indexType, DateTime? fromUtc, DateTime? toUtc, CancellationToken cancellationToken = default)
     {
-        const string filter = """
+        var filter = $"""
             FROM vegetation_index_observations AS o
             JOIN remote_sensing_scenes AS s ON s."Id" = o."SceneId" AND s."OrganizationId" = o."OrganizationId"
-            WHERE o."OrganizationId" = @organizationId
+            WHERE o."OrganizationId" = @organizationId{ObservationScopeSql("o")}
               AND (CAST(@sceneId AS uuid) IS NULL OR o."SceneId" = CAST(@sceneId AS uuid))
               AND (CAST(@fieldId AS uuid) IS NULL OR o."FieldId" = CAST(@fieldId AS uuid))
               AND (CAST(@seasonId AS uuid) IS NULL OR o."SeasonId" = CAST(@seasonId AS uuid))
@@ -180,12 +181,12 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
 
     public Task<VegetationIndexObservationSnapshot?> AddObservationAsync(Guid organizationId, VegetationIndexObservationWriteModel model, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             WITH eligible AS (
                 SELECT s."Id"
                 FROM remote_sensing_scenes AS s
                 LEFT JOIN management_zones AS z ON z."Id" = CAST(@managementZoneId AS uuid)
-                WHERE s."OrganizationId" = @organizationId AND s."Id" = @sceneId AND s."IsActive"
+                WHERE s."OrganizationId" = @organizationId{SceneScopeSql("s")} AND s."Id" = @sceneId AND s."IsActive"
                   AND s."FieldId" = @fieldId
                   AND s."SeasonId" IS NOT DISTINCT FROM CAST(@seasonId AS uuid)
                   AND (CAST(@managementZoneId AS uuid) IS NULL OR (z."OrganizationId" = @organizationId AND z."FieldId" = s."FieldId" AND z."IsActive"))
@@ -208,13 +209,13 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
         Guid organizationId, Guid fieldId, Guid? seasonId, Guid? managementZoneId, string? indexType,
         DateTime? fromUtc, DateTime? toUtc, int take, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             SELECT o."Id", o."SceneId", o."FieldId", o."SeasonId", o."ManagementZoneId", o."IndexType", o."CustomIndexName",
                    o."Minimum", o."Maximum", o."Mean", o."Median", o."StandardDeviation", o."ValidCoveragePercent", o."SampleCount",
                    o."Source", s."Platform", o."ObservedAtUtc", o."CreatedAtUtc"
             FROM vegetation_index_observations AS o
             JOIN remote_sensing_scenes AS s ON s."Id" = o."SceneId" AND s."OrganizationId" = o."OrganizationId"
-            WHERE o."OrganizationId" = @organizationId AND o."FieldId" = @fieldId
+            WHERE o."OrganizationId" = @organizationId{ObservationScopeSql("o")} AND o."FieldId" = @fieldId
               AND (CAST(@seasonId AS uuid) IS NULL OR o."SeasonId" = CAST(@seasonId AS uuid))
               AND (CAST(@managementZoneId AS uuid) IS NULL OR o."ManagementZoneId" = CAST(@managementZoneId AS uuid))
               AND (CAST(@indexType AS text) IS NULL OR o."IndexType" = CAST(@indexType AS text))
@@ -233,9 +234,9 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
 
     public Task<int> CountScenesAsync(Guid organizationId, Guid fieldId, Guid? seasonId, DateTime? fromUtc, DateTime? toUtc, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             SELECT COUNT(*) FROM remote_sensing_scenes AS s
-            WHERE s."OrganizationId" = @organizationId AND s."FieldId" = @fieldId AND s."IsActive"
+            WHERE s."OrganizationId" = @organizationId{SceneScopeSql("s")} AND s."FieldId" = @fieldId AND s."IsActive"
               AND (CAST(@seasonId AS uuid) IS NULL OR s."SeasonId" = CAST(@seasonId AS uuid))
               AND (CAST(@fromUtc AS timestamptz) IS NULL OR s."AcquiredAtUtc" >= CAST(@fromUtc AS timestamptz))
               AND (CAST(@toUtc AS timestamptz) IS NULL OR s."AcquiredAtUtc" <= CAST(@toUtc AS timestamptz));
@@ -340,6 +341,25 @@ public sealed class RemoteSensingRepository(AgroControlDbContext dbContext) : IR
         AddParameter(command, "sampleCount", model.SampleCount); AddParameter(command, "source", model.Source); AddParameter(command, "observedAtUtc", model.ObservedAtUtc);
         AddParameter(command, "createdAtUtc", model.CreatedAtUtc);
     }
+
+    private string FieldScopeSql(string alias)
+    {
+        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;
+        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";
+        return $" AND {alias}.\"FarmId\" IN ({FarmIdSqlList()})";
+    }
+
+    private string SceneScopeSql(string alias) => FieldReferenceScopeSql($"{alias}.\"FieldId\"");
+    private string ObservationScopeSql(string alias) => FieldReferenceScopeSql($"{alias}.\"FieldId\"");
+
+    private string FieldReferenceScopeSql(string fieldIdExpression)
+    {
+        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;
+        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";
+        return $" AND EXISTS (SELECT 1 FROM fields AS scope_field WHERE scope_field.\"OrganizationId\" = @organizationId AND scope_field.\"Id\" = {fieldIdExpression} AND scope_field.\"FarmId\" IN ({FarmIdSqlList()}))";
+    }
+
+    private string FarmIdSqlList() => string.Join(", ", operationalScope!.FarmIds.Select(id => $"'{id:D}'::uuid"));
 
     private static void AddParameter(DbCommand command, string name, object? value)
     {

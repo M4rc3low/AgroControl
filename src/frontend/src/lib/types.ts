@@ -5,7 +5,49 @@ export interface EntitlementSnapshot { plan: string; modules: Record<string, boo
 export interface ModuleDefinition { key: string; name: string; status: 'Active' | 'ComingSoon' | 'Locked' | string; description: string; }
 export interface PlatformContext { profile: MeProfile; organization: Organization; entitlements: EntitlementSnapshot; modules: ModuleDefinition[]; }
 export interface PagedResult<T> { items: T[]; page: number; pageSize: number; totalCount: number; }
-export interface Farm { id: string; name: string; totalAreaHectares: number; city: string | null; state: string | null; isActive: boolean; createdAtUtc: string; updatedAtUtc: string; }
+
+export interface OperationalRegion {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  isActive: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+}
+
+export interface FarmAccessScope {
+  userId: string;
+  allFarms: boolean;
+  farmIds: string[];
+  regionIds: string[];
+}
+
+export type OperationalScope =
+  | { kind: 'all' }
+  | { kind: 'region'; regionId: string }
+  | { kind: 'state'; stateCode: string }
+  | { kind: 'farm'; farmId: string };
+
+export interface Farm {
+  id: string;
+  operationalRegionId: string | null;
+  name: string;
+  totalAreaHectares: number;
+  city: string | null;
+  state: string | null;
+  countryCode: string;
+  stateCode: string | null;
+  municipalityCode: string | null;
+  postalCode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  timeZoneId: string;
+  isActive: boolean;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+}
+
 export interface Field { id: string; farmId: string; name: string; areaHectares: number; isActive: boolean; createdAtUtc: string; updatedAtUtc: string; }
 export interface Crop { id: string; name: string; variety: string | null; isActive: boolean; createdAtUtc: string; updatedAtUtc: string; }
 export interface Season { id: string; fieldId: string; cropId: string; name: string; startDate: string; endDate: string | null; expectedYieldPerHectare: number | null; actualYieldPerHectare: number | null; status: string; isActive: boolean; createdAtUtc: string; updatedAtUtc: string; }

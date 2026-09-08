@@ -1,0 +1,20 @@
+.farm-map-shell { position: relative; min-height: 350px; overflow: hidden; border-radius: 14px; background: #eef2ec; }
+.farm-map { min-height: 350px; width: 100%; }
+.farm-map-marker { width: 18px; height: 18px; border: 3px solid white; border-radius: 50%; background: var(--forest-700); box-shadow: 0 4px 12px rgba(22,63,53,.32); cursor: pointer; transition: transform .15s ease; }
+.farm-map-marker:hover, .farm-map-marker:focus-visible { transform: scale(1.35); outline: none; }
+.farm-map-caption { position: absolute; left: 12px; bottom: 10px; z-index: 3; padding: 6px 9px; border-radius: 8px; background: rgba(255,255,255,.9); color: var(--muted); font-size: 10px; box-shadow: 0 3px 12px rgba(22,63,53,.08); }
+.farm-map-error { position: absolute; inset: auto 12px 42px; z-index: 3; padding: 8px 10px; border-radius: 8px; background: rgba(255,244,224,.95); color: #74460b; font-size: 11px; }
+.farm-map-empty { min-height: 280px; display: grid; place-items: center; align-content: center; gap: 7px; padding: 32px; text-align: center; background: #f5f7f3; border-radius: 14px; }
+.farm-map-empty strong { color: var(--forest-950); }
+.farm-map-empty span { max-width: 520px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.multi-farm-list { display: grid; gap: 7px; }
+.multi-farm-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(90px,.7fr) minmax(90px,.7fr) auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid #edf0eb; }
+.multi-farm-row:first-child { border-top: 0; }
+.multi-farm-row strong, .multi-farm-row span { display: block; }
+.multi-farm-row span { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.multi-farm-row__metric { text-align: right; }
+.multi-farm-row__metric strong { font-size: 12px; }
+.scope-summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.scope-summary__chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: white; color: var(--muted); font-size: 11px; }
+.scope-summary__chip strong { color: var(--forest-900); }
+@media (max-width: 720px) { .multi-farm-row { grid-template-columns: 1fr auto; } .multi-farm-row__metric:nth-child(3) { display: none; } .farm-map, .farm-map-shell { min-height: 290px; } }

@@ -259,6 +259,25 @@
 - [x] testes Python com raster sintético e testes C# de domínio/persistência/contrato;
 - [x] documentação `SPRINT_17_RASTER_PROCESSING.md` e versão API `0.17.0`.
 
+## Sprint 18 — Operação multi-fazenda 🧪
+
+- [x] `Farm` como fronteira operacional abaixo de `Organization`;
+- [x] regiões operacionais e localização estruturada por propriedade;
+- [x] escopo explícito `AllFarms`, `Region` e `Farm` por usuário;
+- [x] `OperationalScopeContext` por request e filtros horizontais EF Core;
+- [x] proteção explícita de SQL/PostGIS para Agricultura de Precisão, Sensoriamento Remoto e Raster;
+- [x] proteção de Telemetry por Farm/Field/Machine;
+- [x] matriz A × B na mesma organização para os módulos vinculados a fazenda;
+- [x] seletor global Todas / Região / UF / Fazenda com persistência do contexto;
+- [x] dashboard e mapa multi-fazenda;
+- [x] consolidação financeira em BRL sem média indevida de percentuais;
+- [x] comparações sem agregar produtividade/unidades incompatíveis;
+- [x] timezone IANA por propriedade e apresentação operacional SP × MT × AM × AC;
+- [x] migration `MultiFarmRegionalOperations` e hardening de backfill por UF;
+- [x] documentação `SPRINT_18_MULTI_FARM.md` e versão API `0.18.0`;
+- [ ] Backend CI, Frontend CI, Platform CI e CodeQL verdes no head final;
+- [ ] squash merge do PR da Sprint 18 e encerramento da Issue #50.
+
 ## Próximos aprimoramentos
 
 O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para catálogo STAC e descoberta de cenas, ingestão assíncrona de assets, máscaras de qualidade/nuvem, geração de produtos a partir de bandas brutas, importação KML/Shapefile e aprofundamento agronômico, mantendo essas responsabilidades separadas do monólito transacional.

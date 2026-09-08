@@ -15,8 +15,10 @@ using AgroControl.Application.Market;
 using AgroControl.Application.Platform;
 using AgroControl.Application.PrecisionAgriculture;
 using AgroControl.Application.Production;
+using AgroControl.Application.RegionalOperations;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Application.Sustainability;
+using AgroControl.Application.Telemetry;
 using AgroControl.Domain.Platform;
 using AgroControl.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -42,6 +44,7 @@ builder.Services.AddSingleton<PlanEntitlementCatalog>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ModuleAccessService>();
 builder.Services.AddScoped<FarmService>();
+builder.Services.AddScoped<MultiFarmService>();
 builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<SeasonService>();
@@ -57,6 +60,7 @@ builder.Services.AddScoped<IntelligenceService>();
 builder.Services.AddScoped<PrecisionAgricultureService>();
 builder.Services.AddScoped<RemoteSensingService>();
 builder.Services.AddScoped<RasterProcessingService>();
+builder.Services.AddScoped<TelemetryAccessService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 if (builder.Configuration.GetValue<bool>("Observability:Enabled"))
@@ -103,10 +107,24 @@ builder.Services.AddAuthorization();
 var app = builder.Build();
 app.UseExceptionHandler();
 app.UseAuthentication();
+app.Use(async (httpContext, next) =>
+{
+    if (httpContext.User.Identity?.IsAuthenticated == true &&
+        TryGetOrganizationId(httpContext.User, out var organizationId) &&
+        TryGetUserId(httpContext.User, out var userId))
+    {
+        var currentScope = httpContext.RequestServices.GetRequiredService<OperationalScopeContext>();
+        var accessScope = httpContext.RequestServices.GetRequiredService<IFarmAccessScope>();
+        var snapshot = await accessScope.GetEffectiveScopeAsync(organizationId, userId, httpContext.RequestAborted);
+        currentScope.Initialize(organizationId, userId, snapshot);
+    }
+
+    await next();
+});
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.17.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.18.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -157,6 +175,7 @@ authorized.MapGet("/platform/modules/{moduleKey}/access", async (string moduleKe
 });
 
 app.MapProductionEndpoints();
+app.MapMultiFarmEndpoints();
 app.MapInventoryEndpoints();
 app.MapFinanceEndpoints();
 app.MapMachineryEndpoints();
@@ -172,3 +191,4 @@ app.MapCommercialEndpoints();
 app.Run();
 
 static bool TryGetOrganizationId(ClaimsPrincipal principal, out Guid organizationId) => Guid.TryParse(principal.FindFirstValue("org_id"), out organizationId);
+static bool TryGetUserId(ClaimsPrincipal principal, out Guid userId) => Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub"), out userId);

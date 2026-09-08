@@ -4,16 +4,49 @@ namespace AgroControl.Application.Production;
 
 public sealed record FarmDto(
     Guid Id,
+    Guid? OperationalRegionId,
     string Name,
     decimal TotalAreaHectares,
     string? City,
     string? State,
+    string CountryCode,
+    string? StateCode,
+    string? MunicipalityCode,
+    string? PostalCode,
+    decimal? Latitude,
+    decimal? Longitude,
+    string TimeZoneId,
     bool IsActive,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc);
 
-public sealed record CreateFarmCommand(string Name, decimal TotalAreaHectares, string? City, string? State);
-public sealed record UpdateFarmCommand(string Name, decimal TotalAreaHectares, string? City, string? State);
+public sealed record CreateFarmCommand(
+    string Name,
+    decimal TotalAreaHectares,
+    string? City,
+    string? State,
+    Guid? OperationalRegionId = null,
+    string CountryCode = "BR",
+    string? StateCode = null,
+    string? MunicipalityCode = null,
+    string? PostalCode = null,
+    decimal? Latitude = null,
+    decimal? Longitude = null,
+    string? TimeZoneId = null);
+
+public sealed record UpdateFarmCommand(
+    string Name,
+    decimal TotalAreaHectares,
+    string? City,
+    string? State,
+    Guid? OperationalRegionId = null,
+    string CountryCode = "BR",
+    string? StateCode = null,
+    string? MunicipalityCode = null,
+    string? PostalCode = null,
+    decimal? Latitude = null,
+    decimal? Longitude = null,
+    string? TimeZoneId = null);
 
 public sealed record FieldDto(
     Guid Id,

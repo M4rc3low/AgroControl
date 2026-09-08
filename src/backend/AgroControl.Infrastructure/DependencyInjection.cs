@@ -10,6 +10,7 @@ using AgroControl.Application.Machinery;
 using AgroControl.Application.Market;
 using AgroControl.Application.PrecisionAgriculture;
 using AgroControl.Application.Production;
+using AgroControl.Application.RegionalOperations;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Application.Sustainability;
 using AgroControl.Application.Telemetry;
@@ -28,10 +29,14 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required.");
+        services.AddScoped<OperationalScopeContext>();
+        services.AddScoped<IOperationalScopeContext>(provider => provider.GetRequiredService<OperationalScopeContext>());
         services.AddDbContext<AgroControlDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
         services.AddScoped<IProductionRepository, ProductionRepository>();
+        services.AddScoped<IMultiFarmRepository, MultiFarmRepository>();
+        services.AddScoped<IFarmAccessScope, FarmAccessScopeService>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IIrrigationRepository, IrrigationRepository>();
         services.AddScoped<ISustainabilityRepository, SustainabilityRepository>();
