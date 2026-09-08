@@ -16,6 +16,7 @@ public enum ModuleKey
     Intelligence,
     Irrigation,
     Sustainability,
+    Commercial,
     Export,
     Telemetry
 }

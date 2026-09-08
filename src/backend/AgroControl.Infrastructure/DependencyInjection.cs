@@ -1,4 +1,5 @@
 using AgroControl.Application.Common;
+using AgroControl.Application.Commercial;
 using AgroControl.Application.Finance;
 using AgroControl.Application.Exporting;
 using AgroControl.Application.Identity;
@@ -35,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IIrrigationRepository, IrrigationRepository>();
         services.AddScoped<ISustainabilityRepository, SustainabilityRepository>();
         services.AddScoped<IExportRepository, ExportRepository>();
+        services.AddScoped<ICommercialRepository, CommercialRepository>();
         services.AddScoped<IFinanceRepository, FinanceRepository>();
         services.AddScoped<IMachineryRepository, MachineryRepository>();
         services.AddScoped<IMarketRepository, MarketRepository>();

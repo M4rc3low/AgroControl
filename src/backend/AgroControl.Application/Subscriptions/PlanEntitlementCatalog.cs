@@ -24,7 +24,8 @@ public sealed class PlanEntitlementCatalog
         ModuleKey.Market,
         ModuleKey.PrecisionAgriculture,
         ModuleKey.Irrigation,
-        ModuleKey.Sustainability
+        ModuleKey.Sustainability,
+        ModuleKey.Commercial
     ];
 
     private static readonly HashSet<ModuleKey> IntelligenceModules =
