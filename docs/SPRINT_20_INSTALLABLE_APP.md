@@ -91,11 +91,13 @@ A janela desktop:
 - continua autenticando na API via JWT;
 - continua sujeita a `OrganizationId`, entitlements e `FarmAccessScope`.
 
-## URL da API no desktop
+## URL da API e CORS
 
 No navegador normal, o AgroControl pode continuar usando proxy same-origin.
 
 No build desktop, `VITE_API_BASE_URL` deve ser definido durante a compilação para o endpoint da API. O CI usa `http://localhost:8080` apenas como configuração de build/teste.
+
+No Windows, o shell empacotado usa `http://tauri.localhost` como origem. A API aceita essa origem por uma política CORS configurada por allowlist; não há `AllowAnyOrigin` e a autorização continua sendo realizada pelo JWT e pelas fronteiras `OrganizationId`/`FarmAccessScope`.
 
 **Um release de produção não deve ser publicado enquanto a URL HTTPS pública da API e a CSP correspondente não estiverem definidas.**
 
@@ -108,10 +110,16 @@ Princípios:
 - service worker não cria cache de dados autenticados;
 - sem comandos nativos até existir necessidade concreta;
 - capabilities Tauri seguem least privilege;
-- CSP deve ser restringida ao endpoint real antes da distribuição de produção;
+- CORS usa origens explícitas;
 - o instalador Windows só será considerado distribuição oficial depois de assinatura de código real.
 
-A configuração atual permite `https:` em `connect-src` para que a arquitetura possa ser validada antes de existir o domínio de produção. Este ponto é **temporário** e deve ser fechado para a origem HTTPS real antes de release público.
+A configuração de CI/Desktop atual permite conexão apenas com:
+
+- a própria origem do shell;
+- `http://localhost:8080` para a API de desenvolvimento/CI;
+- `https://demotiles.maplibre.org` para o estilo/tiles padrão do mapa.
+
+Scripts e CSS do MapLibre permanecem limitados ao host padrão já utilizado pela Web (`https://unpkg.com`). A origem HTTPS real da API deverá ser adicionada de forma explícita ao CSP no momento em que definirmos o ambiente público; não será usado um wildcard `https:` para isso.
 
 ## Windows e WebView2
 
