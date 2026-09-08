@@ -61,7 +61,10 @@ def test_zonal_statistics_respect_geometry_and_nodata(tmp_path: Path) -> None:
 def test_duplicate_target_keys_are_rejected(tmp_path: Path) -> None:
     raster = tmp_path / "ndvi.tif"
     _write_raster(raster)
-    geometry = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}
+    geometry = {
+        "type": "Polygon",
+        "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
+    }
     targets = [RasterTarget("same", geometry), RasterTarget("same", geometry)]
 
     try:
