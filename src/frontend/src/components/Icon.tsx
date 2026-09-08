@@ -1,9 +1,10 @@
-type IconName = 'dashboard' | 'leaf' | 'map' | 'box' | 'wallet' | 'tractor' | 'chart' | 'spark' | 'radio' | 'grid' | 'menu' | 'logout' | 'plus' | 'search' | 'edit' | 'trash' | 'lock' | 'refresh' | 'close' | 'arrow';
+type IconName = 'dashboard' | 'leaf' | 'map' | 'droplet' | 'box' | 'wallet' | 'tractor' | 'chart' | 'spark' | 'radio' | 'grid' | 'menu' | 'logout' | 'plus' | 'search' | 'edit' | 'trash' | 'lock' | 'refresh' | 'close' | 'arrow';
 
 const paths: Record<IconName, string[]> = {
   dashboard: ['M4 13h6V4H4v9Z', 'M14 20h6v-9h-6v9Z', 'M14 4h6v3h-6V4Z', 'M4 20h6v-3H4v3Z'],
   leaf: ['M11 20A7 7 0 0 1 9.8 6.1C15 5 19 2 20 2c0 8-3.8 14-9 14', 'M2 21c3-6 7-10 13-13'],
   map: ['M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3Z', 'M9 3v15', 'M15 6v15'],
+  droplet: ['M12 2s7 7.2 7 12a7 7 0 1 1-14 0C5 9.2 12 2 12 2Z', 'M9 16c.7 1 1.7 1.5 3 1.5'],
   box: ['m21 8-9 5-9-5', 'm3 8 9-5 9 5v8l-9 5-9-5Z', 'M12 13v8'],
   wallet: ['M20 7V6a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v8H5a3 3 0 0 1-3-3V7', 'M16 14h.01'],
   tractor: ['M3 4h9l2 7h4l3 3v3h-2', 'M7 17h6', 'M5 20a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z', 'M16 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z'],
