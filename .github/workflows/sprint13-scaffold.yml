@@ -11,6 +11,25 @@ permissions:
 jobs:
   scaffold:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5-alpine
+        env:
+          POSTGRES_DB: agrocontrol_test
+          POSTGRES_USER: agrocontrol
+          POSTGRES_PASSWORD: agrocontrol_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agrocontrol -d agrocontrol_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      AGROCONTROL_TEST_CONNECTION_STRING: Host=localhost;Port=5432;Database=agrocontrol_test;Username=agrocontrol;Password=agrocontrol_test
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,8 +87,6 @@ jobs:
         run: dotnet ef migrations add ExportCore --project src/backend/AgroControl.Infrastructure --startup-project src/backend/AgroControl.Infrastructure --no-build
       - name: Validate backend
         run: dotnet test AgroControl.sln --configuration Release --no-restore
-        env:
-          AGROCONTROL_TEST_CONNECTION_STRING: Host=localhost;Port=5432;Database=agrocontrol_test;Username=postgres;Password=postgres
       - name: Validate frontend
         working-directory: src/frontend
         run: |
