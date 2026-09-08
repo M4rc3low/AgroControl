@@ -65,7 +65,8 @@ public enum RemoteSceneDiscoveryCallErrorKind
     Validation = 1,
     Timeout = 2,
     Unavailable = 3,
-    InvalidPayload = 4
+    InvalidPayload = 4,
+    NotFound = 5
 }
 
 public sealed record RemoteSceneDiscoveryCallResult(
@@ -110,6 +111,9 @@ public sealed record RemoteSceneDiscoveryItemCallResult(
 
     public static RemoteSceneDiscoveryItemCallResult InvalidPayload(string error) =>
         new(false, null, RemoteSceneDiscoveryCallErrorKind.InvalidPayload, error);
+
+    public static RemoteSceneDiscoveryItemCallResult NotFound(string error) =>
+        new(false, null, RemoteSceneDiscoveryCallErrorKind.NotFound, error);
 }
 
 public enum RemoteSceneDiscoveryResultKind
