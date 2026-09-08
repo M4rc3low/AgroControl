@@ -7,6 +7,7 @@ using AgroControl.Application.Finance;
 using AgroControl.Application.Identity;
 using AgroControl.Application.Intelligence;
 using AgroControl.Application.Inventory;
+using AgroControl.Application.Irrigation;
 using AgroControl.Application.Machinery;
 using AgroControl.Application.Market;
 using AgroControl.Application.Platform;
@@ -42,6 +43,7 @@ builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<SeasonService>();
 builder.Services.AddScoped<InventoryService>();
+builder.Services.AddScoped<IrrigationService>();
 builder.Services.AddScoped<FinanceService>();
 builder.Services.AddScoped<MachineryService>();
 builder.Services.AddScoped<MarketService>();
@@ -96,7 +98,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.10.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.11.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -154,6 +156,7 @@ app.MapMarketEndpoints();
 app.MapIntelligenceEndpoints();
 app.MapTelemetryEndpoints();
 app.MapPrecisionAgricultureEndpoints();
+app.MapIrrigationEndpoints();
 app.Run();
 
 static bool TryGetOrganizationId(ClaimsPrincipal principal, out Guid organizationId) => Guid.TryParse(principal.FindFirstValue("org_id"), out organizationId);

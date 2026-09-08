@@ -18,7 +18,7 @@ public sealed class ModuleCatalog : IModuleCatalog
         new(ModuleKey.Market, "Market", ModuleStatus.Active, "Mercado, preços e commodities."),
         new(ModuleKey.PrecisionAgriculture, "Precision Agriculture", ModuleStatus.Active, "Talhões georreferenciados, mapas e agricultura de precisão."),
         new(ModuleKey.Intelligence, "Agro Intelligence", ModuleStatus.Active, "Análise de dados, previsão e IA."),
-        new(ModuleKey.Irrigation, "Irrigation", ModuleStatus.Locked, "Irrigação, clima e umidade."),
+        new(ModuleKey.Irrigation, "Irrigation", ModuleStatus.Active, "Zonas de irrigação, umidade do solo e manejo hídrico."),
         new(ModuleKey.Sustainability, "Sustainability", ModuleStatus.Locked, "Indicadores ambientais e carbono."),
         new(ModuleKey.Export, "Export", ModuleStatus.Locked, "Comércio exterior, câmbio e logística."),
         new(ModuleKey.Telemetry, "Telemetry", ModuleStatus.Active, "Sensores, GPS, máquinas e IoT.")

@@ -2,7 +2,7 @@
 
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 10 concluída — Agricultura de Precisão com PostGIS e talhões georreferenciados**
+> Status atual: **Sprint 11 concluída — Irrigação, umidade do solo e manejo hídrico**
 
 ## Objetivo
 
@@ -16,7 +16,8 @@ Centralizar os principais fluxos de uma operação rural em uma única plataform
 - commodities e alertas de mercado;
 - análise de dados e previsão de produtividade;
 - sensores, GPS, estações e telemetria;
-- módulos futuros de irrigação, sustentabilidade e exportação.
+- zonas de irrigação, umidade do solo e aplicações de água;
+- módulos futuros de sustentabilidade e exportação.
 
 Os módulos são liberados por plano e o bloqueio é validado no backend, não apenas na interface.
 
@@ -75,6 +76,7 @@ A aplicação web mantém o navegador no mesmo origin para `/api`; a API concent
 - dashboard com propriedades, área, talhões, safras, estoque baixo e resumo financeiro;
 - CRUD web de propriedades, talhões, culturas e safras;
 - workspace de agricultura de precisão com mapa e limites de talhões;
+- painel de irrigação com zonas, condição hídrica, aplicações e volume estimado;
 - layout para desktop, tablet e mobile;
 - proxy reverso same-origin no Nginx.
 
@@ -108,6 +110,20 @@ O frontend melhora a experiência, mas **não substitui as validações de autor
 - leitura, cadastro, redesenho e remoção de limites;
 - isolamento por organização e proteção pelo entitlement `PrecisionAgriculture`;
 - mapa MapLibre configurável por ambiente.
+
+### Irrigação
+
+- zonas de irrigação vinculadas a talhões, com área, método e status;
+- limites mínimo, alvo e máximo de umidade do solo;
+- vínculo opcional com dispositivo do AgroControl Telemetry;
+- leitura canônica `soil_moisture_percent` sem duplicar a série temporal no banco principal;
+- classificação `Critical`, `Dry`, `Target` e `Wet`;
+- recomendações `Irrigate`, `Monitor` e `AvoidIrrigation` como apoio à decisão;
+- aplicações de água em histórico append-only;
+- volume estimado pela relação `1 mm × 1 ha = 10 m³`;
+- correções por lançamento compensatório, preservando o histórico;
+- isolamento por organização e proteção pelo entitlement `Irrigation`;
+- nenhuma atuação automática em bombas, pivôs ou válvulas.
 
 ### Estoque
 
@@ -219,6 +235,7 @@ GET  /api/v1/platform/entitlements
 /api/v1/crops
 /api/v1/seasons
 /api/v1/precision/*
+/api/v1/irrigation/*
 /api/v1/inventory/*
 /api/v1/finance/*
 /api/v1/machinery/*
@@ -248,6 +265,7 @@ A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e 
 - [`docs/SPRINT_8_PLATFORM_DEVOPS.md`](docs/SPRINT_8_PLATFORM_DEVOPS.md)
 - [`docs/SPRINT_9_WEB.md`](docs/SPRINT_9_WEB.md)
 - [`docs/SPRINT_10_PRECISION_AGRICULTURE.md`](docs/SPRINT_10_PRECISION_AGRICULTURE.md)
+- [`docs/SPRINT_11_IRRIGATION.md`](docs/SPRINT_11_IRRIGATION.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## Roadmap resumido
@@ -263,6 +281,7 @@ A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e 
 9. ✅ **Sprint 8** — observabilidade, CI/CD, segurança operacional e Kubernetes.
 10. ✅ **Sprint 9** — AgroControl Web, autenticação, dashboard e produção rural no navegador.
 11. ✅ **Sprint 10** — PostGIS, GeoJSON, talhões georreferenciados e mapas.
+12. ✅ **Sprint 11** — irrigação, umidade do solo, aplicações de água e manejo hídrico.
 
 O hardening que depende de ambiente real, política operacional ou testes de carga está separado no issue **#18**.
 

@@ -121,6 +121,24 @@
 - [x] testes unitários frontend/backend e integração PostGIS;
 - [x] documentação da fundação espacial.
 
+## Sprint 11 — Irrigação ✅
+
+- [x] zonas de irrigação vinculadas a talhões da mesma organização;
+- [x] área, método, status e limites mínimo/alvo/máximo de umidade;
+- [x] vínculo opcional com dispositivo de telemetria;
+- [x] validação de área contra o talhão;
+- [x] aplicações de água append-only;
+- [x] cálculo determinístico de volume em m³;
+- [x] correções por registro compensatório;
+- [x] métrica canônica `soil_moisture_percent` consultada no Telemetry;
+- [x] classificação `Critical`, `Dry`, `Target` e `Wet`;
+- [x] recomendações sem atuação autônoma em equipamentos;
+- [x] API protegida por `Irrigation` e isolamento multi-tenant;
+- [x] interface web responsiva para zonas, leituras e aplicações;
+- [x] migration `IrrigationCore` e índices;
+- [x] testes unitários e integração PostgreSQL;
+- [x] documentação da Sprint 11.
+
 ## Próximos aprimoramentos
 
-O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para irrigação/clima, sustentabilidade, importação de geometrias, imagens de satélite/drone, índices vegetativos e zonas de manejo, mantendo cada responsabilidade em uma sprint separada.
+O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para sustentabilidade e indicadores ambientais, importação de geometrias, imagens de satélite/drone, índices vegetativos, zonas de manejo e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.

@@ -4,6 +4,7 @@ using AgroControl.Domain.Modules.Fields;
 using AgroControl.Domain.Modules.Finance;
 using AgroControl.Domain.Modules.Identity;
 using AgroControl.Domain.Modules.Inventory;
+using AgroControl.Domain.Modules.Irrigation;
 using AgroControl.Domain.Modules.Machinery;
 using AgroControl.Domain.Modules.Market;
 using AgroControl.Domain.Modules.Organizations;
@@ -28,6 +29,8 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<IrrigationZone> IrrigationZones => Set<IrrigationZone>();
+    public DbSet<IrrigationApplication> IrrigationApplications => Set<IrrigationApplication>();
     public DbSet<FinancialCategory> FinancialCategories => Set<FinancialCategory>();
     public DbSet<CostCenter> CostCenters => Set<CostCenter>();
     public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
@@ -237,6 +240,34 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
             entity.HasOne<Commodity>().WithMany().HasForeignKey(x => x.CommodityId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => x.OrganizationId);
             entity.HasIndex(x => new { x.OrganizationId, x.CommodityId, x.IsActive });
+        });
+        modelBuilder.Entity<IrrigationZone>(entity =>
+        {
+            entity.ToTable("irrigation_zones"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.AreaHectares).HasPrecision(18, 4).IsRequired();
+            entity.Property(x => x.Method).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.MinimumMoisturePercent).HasPrecision(5, 2).IsRequired();
+            entity.Property(x => x.TargetMoisturePercent).HasPrecision(5, 2).IsRequired();
+            entity.Property(x => x.MaximumMoisturePercent).HasPrecision(5, 2).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.FieldId);
+            entity.HasIndex(x => new { x.OrganizationId, x.FieldId, x.IsActive });
+        });
+        modelBuilder.Entity<IrrigationApplication>(entity =>
+        {
+            entity.ToTable("irrigation_applications"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.AreaHectaresSnapshot).HasPrecision(18, 4).IsRequired();
+            entity.Property(x => x.DepthMillimeters).HasPrecision(18, 3).IsRequired();
+            entity.Property(x => x.EstimatedVolumeCubicMeters).HasPrecision(18, 3).IsRequired();
+            entity.Property(x => x.Source).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<IrrigationZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.FieldId); entity.HasIndex(x => x.ZoneId);
+            entity.HasIndex(x => new { x.OrganizationId, x.ZoneId, x.StartedAtUtc });
         });
     }
 }

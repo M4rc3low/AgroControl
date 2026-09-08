@@ -9,6 +9,7 @@ const navigation = [
   { to: '/', label: 'Visão geral', icon: 'dashboard' as const },
   { to: '/production', label: 'Produção rural', icon: 'leaf' as const, module: 'Farms' },
   { to: '/precision', label: 'Agricultura de precisão', icon: 'map' as const, module: 'PrecisionAgriculture' },
+  { to: '/irrigation', label: 'Irrigação', icon: 'droplet' as const, module: 'Irrigation' },
   { to: '/inventory', label: 'Estoque', icon: 'box' as const, module: 'Inventory' },
   { to: '/finance', label: 'Financeiro', icon: 'wallet' as const, module: 'Finance' },
   { to: '/machinery', label: 'Máquinas', icon: 'tractor' as const, module: 'Machinery' },
