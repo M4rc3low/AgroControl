@@ -71,7 +71,12 @@ def _validate_remote_host(value: str) -> None:
         address = ipaddress.ip_address(parsed.hostname)
     except ValueError:
         return
-    if address.is_private or address.is_loopback or address.is_link_local or address.is_reserved:
+    if (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_reserved
+    ):
         raise RasterProcessingError("Private or loopback raster URL hosts are not allowed.")
 
 
@@ -82,18 +87,26 @@ def validate_asset_reference(asset_reference: str) -> str:
     if value.startswith(("http://", "https://", "s3://", "gs://")):
         if not _remote_assets_enabled():
             raise RasterProcessingError(
-                "Remote raster assets are disabled. Enable them explicitly in the Intelligence environment."
+                "Remote raster assets are disabled. Enable them explicitly in the "
+                "Intelligence environment."
             )
         if value.startswith(("http://", "https://")):
             _validate_remote_host(value)
         return value
     path = Path(value).expanduser().resolve()
     if not path.exists() or not path.is_file():
-        raise RasterProcessingError("Raster asset is not accessible in the Intelligence environment.")
+        raise RasterProcessingError(
+            "Raster asset is not accessible in the Intelligence environment."
+        )
     return str(path)
 
 
-def _statistics_for_geometry(dataset: Any, geometry: dict[str, Any], geometry_crs: str, band: int) -> RasterStatistics:
+def _statistics_for_geometry(
+    dataset: Any,
+    geometry: dict[str, Any],
+    geometry_crs: str,
+    band: int,
+) -> RasterStatistics:
     if not geometry or geometry.get("type") not in {"Polygon", "MultiPolygon"}:
         raise RasterProcessingError("A Polygon or MultiPolygon geometry is required.")
 
@@ -139,9 +152,13 @@ def compute_zonal_statistics_many(
     if not targets:
         raise RasterProcessingError("At least one target geometry is required.")
     if len(targets) > MAX_TARGETS:
-        raise RasterProcessingError(f"At most {MAX_TARGETS} target geometries may be processed at once.")
+        raise RasterProcessingError(
+            f"At most {MAX_TARGETS} target geometries may be processed at once."
+        )
     if len({target.key for target in targets}) != len(targets):
-        raise RasterProcessingError("Target keys must be unique within a processing request.")
+        raise RasterProcessingError(
+            "Target keys must be unique within a processing request."
+        )
 
     asset = validate_asset_reference(asset_reference)
     try:
@@ -157,14 +174,23 @@ def compute_zonal_statistics_many(
                 crs=dataset.crs.to_string(),
                 width=dataset.width,
                 height=dataset.height,
-                nodata=None if dataset.nodata is None or not np.isfinite(dataset.nodata) else float(dataset.nodata),
+                nodata=(
+                    None
+                    if dataset.nodata is None or not np.isfinite(dataset.nodata)
+                    else float(dataset.nodata)
+                ),
                 resolution_x=float(abs(dataset.res[0])),
                 resolution_y=float(abs(dataset.res[1])),
             )
             results = [
                 RasterTargetResult(
                     key=target.key,
-                    statistics=_statistics_for_geometry(dataset, target.geometry, geometry_crs, band),
+                    statistics=_statistics_for_geometry(
+                        dataset,
+                        target.geometry,
+                        geometry_crs,
+                        band,
+                    ),
                 )
                 for target in targets
             ]
