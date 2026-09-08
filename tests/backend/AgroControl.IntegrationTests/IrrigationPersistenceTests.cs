@@ -42,6 +42,18 @@ public sealed class IrrigationPersistenceTests
         var telemetry = new FakeTelemetryClient(organizationA.Id, deviceId, fieldA.Id, 42d);
         var service = new IrrigationService(repository, productionRepository, telemetry, unitOfWork);
 
+        var oversized = await service.CreateZoneAsync(organizationA.Id, new CreateIrrigationZoneCommand(
+            fieldA.Id, "Zona grande", 21m, IrrigationMethod.CenterPivot, 35m, 50m, 75m, null));
+        Assert.False(oversized.Succeeded);
+        Assert.Contains("cannot exceed", oversized.Error, StringComparison.OrdinalIgnoreCase);
+
+        var wrongFieldTelemetry = new FakeTelemetryClient(organizationA.Id, deviceId, fieldB.Id, 42d);
+        var serviceWithWrongFieldDevice = new IrrigationService(repository, productionRepository, wrongFieldTelemetry, unitOfWork);
+        var wrongDevice = await serviceWithWrongFieldDevice.CreateZoneAsync(organizationA.Id, new CreateIrrigationZoneCommand(
+            fieldA.Id, "Zona device incorreto", 5m, IrrigationMethod.Drip, 35m, 50m, 75m, deviceId));
+        Assert.False(wrongDevice.Succeeded);
+        Assert.Contains("different field", wrongDevice.Error, StringComparison.OrdinalIgnoreCase);
+
         var created = await service.CreateZoneAsync(organizationA.Id, new CreateIrrigationZoneCommand(
             fieldA.Id, "Zona 1", 5m, IrrigationMethod.Drip, 35m, 50m, 75m, deviceId));
         Assert.True(created.Succeeded);
