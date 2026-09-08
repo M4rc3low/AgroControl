@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgis/postgis:17-3.5-alpine
     container_name: agrocontrol-postgres
     restart: unless-stopped
     environment:
@@ -130,6 +130,10 @@ services:
     build:
       context: .
       dockerfile: src/frontend/Dockerfile
+      args:
+        VITE_MAPLIBRE_SCRIPT_URL: ${VITE_MAPLIBRE_SCRIPT_URL:-}
+        VITE_MAPLIBRE_CSS_URL: ${VITE_MAPLIBRE_CSS_URL:-}
+        VITE_MAP_STYLE_URL: ${VITE_MAP_STYLE_URL:-}
     container_name: agrocontrol-web
     restart: unless-stopped
     environment:
