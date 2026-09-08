@@ -133,7 +133,7 @@ public sealed class CommercialService(ICommercialRepository repository, IProduct
         {
             var now = DateTime.UtcNow;
             var opportunity = CommercialOpportunity.Create(organizationId, command.CustomerId, command.Title,
-                refs.FarmId, refs.CropId, command.SeasonId, command.ExportOrderId, command.ExpectedValue,
+                refs.FarmId, refs.CropId, refs.SeasonId, command.ExportOrderId, command.ExpectedValue,
                 command.Currency, command.ProbabilityPercent, command.ExpectedCloseDate, command.OwnerName,
                 command.NextStep, command.Notes, now);
             repository.AddOpportunity(opportunity);
@@ -155,7 +155,7 @@ public sealed class CommercialService(ICommercialRepository repository, IProduct
         if (refs.Error is not null) return OperationResult<CommercialOpportunityDto>.Validation(refs.Error);
         try
         {
-            opportunity.Update(command.Title, refs.FarmId, refs.CropId, command.SeasonId, command.ExportOrderId,
+            opportunity.Update(command.Title, refs.FarmId, refs.CropId, refs.SeasonId, command.ExportOrderId,
                 command.ExpectedValue, command.Currency, command.ProbabilityPercent, command.ExpectedCloseDate,
                 command.OwnerName, command.NextStep, command.Notes, DateTime.UtcNow);
             await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -221,24 +221,56 @@ public sealed class CommercialService(ICommercialRepository repository, IProduct
     {
         Guid? normalizedFarm = farmId;
         Guid? normalizedCrop = cropId;
-        if (seasonId is not null)
+        Guid? normalizedSeason = seasonId;
+
+        if (exportOrderId is not null)
         {
-            var season = await productionRepository.GetSeasonAsync(organizationId, seasonId.Value, false, cancellationToken);
+            var exportOrder = await exportRepository.GetOrderAsync(organizationId, exportOrderId.Value, false, cancellationToken);
+            if (exportOrder is null) return ReferenceResult.Fail("Export order does not belong to this organization.");
+
+            if (exportOrder.FarmId is not null)
+            {
+                if (normalizedFarm is not null && normalizedFarm.Value != exportOrder.FarmId.Value)
+                    return ReferenceResult.Fail("Export order does not belong to the informed farm.");
+                normalizedFarm = exportOrder.FarmId;
+            }
+
+            if (exportOrder.CropId is not null)
+            {
+                if (normalizedCrop is not null && normalizedCrop.Value != exportOrder.CropId.Value)
+                    return ReferenceResult.Fail("Export order does not belong to the informed crop.");
+                normalizedCrop = exportOrder.CropId;
+            }
+
+            if (exportOrder.SeasonId is not null)
+            {
+                if (normalizedSeason is not null && normalizedSeason.Value != exportOrder.SeasonId.Value)
+                    return ReferenceResult.Fail("Export order does not belong to the informed season.");
+                normalizedSeason = exportOrder.SeasonId;
+            }
+        }
+
+        if (normalizedSeason is not null)
+        {
+            var season = await productionRepository.GetSeasonAsync(organizationId, normalizedSeason.Value, false, cancellationToken);
             if (season is null) return ReferenceResult.Fail("Season does not belong to this organization.");
-            if (cropId is not null && cropId.Value != season.CropId) return ReferenceResult.Fail("Season does not belong to the informed crop.");
+            if (normalizedCrop is not null && normalizedCrop.Value != season.CropId)
+                return ReferenceResult.Fail("Season does not belong to the informed crop.");
             normalizedCrop = season.CropId;
+
             var field = await productionRepository.GetFieldAsync(organizationId, season.FieldId, false, cancellationToken);
             if (field is null) return ReferenceResult.Fail("Season field does not belong to this organization.");
-            if (farmId is not null && farmId.Value != field.FarmId) return ReferenceResult.Fail("Season does not belong to the informed farm.");
+            if (normalizedFarm is not null && normalizedFarm.Value != field.FarmId)
+                return ReferenceResult.Fail("Season does not belong to the informed farm.");
             normalizedFarm = field.FarmId;
         }
+
         if (normalizedFarm is not null && await productionRepository.GetFarmAsync(organizationId, normalizedFarm.Value, false, cancellationToken) is null)
             return ReferenceResult.Fail("Farm does not belong to this organization.");
         if (normalizedCrop is not null && await productionRepository.GetCropAsync(organizationId, normalizedCrop.Value, false, cancellationToken) is null)
             return ReferenceResult.Fail("Crop does not belong to this organization.");
-        if (exportOrderId is not null && await exportRepository.GetOrderAsync(organizationId, exportOrderId.Value, false, cancellationToken) is null)
-            return ReferenceResult.Fail("Export order does not belong to this organization.");
-        return new ReferenceResult(normalizedFarm, normalizedCrop, null);
+
+        return new ReferenceResult(normalizedFarm, normalizedCrop, normalizedSeason, null);
     }
 
     private static CommercialCustomerDto ToDto(CommercialCustomer x) => new(x.Id, x.Name, x.TradeName, x.TaxId,
@@ -254,8 +286,8 @@ public sealed class CommercialService(ICommercialRepository repository, IProduct
     private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static string? NormalizeCurrency(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
     private static (int Page, int PageSize) NormalizePaging(int page, int pageSize) => (Math.Max(1, page), Math.Clamp(pageSize, 1, 100));
-    private sealed record ReferenceResult(Guid? FarmId, Guid? CropId, string? Error)
+    private sealed record ReferenceResult(Guid? FarmId, Guid? CropId, Guid? SeasonId, string? Error)
     {
-        public static ReferenceResult Fail(string error) => new(null, null, error);
+        public static ReferenceResult Fail(string error) => new(null, null, null, error);
     }
 }
