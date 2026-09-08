@@ -60,7 +60,9 @@ def yield_prediction(request: YieldPredictionRequest) -> YieldPredictionResponse
 
 
 @app.post("/api/v1/raster/zonal-statistics", response_model=RasterZonalStatisticsResponse)
-def raster_zonal_statistics(request: RasterZonalStatisticsRequest) -> RasterZonalStatisticsResponse:
+def raster_zonal_statistics(
+    request: RasterZonalStatisticsRequest,
+) -> RasterZonalStatisticsResponse:
     try:
         metadata, results = compute_zonal_statistics_many(
             request.asset_reference,
