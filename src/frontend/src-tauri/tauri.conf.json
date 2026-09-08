@@ -29,8 +29,8 @@
       "capabilities": [],
       "csp": {
         "default-src": "'self'",
-        "connect-src": ["'self'", "http://localhost:8080"],
-        "img-src": ["'self'", "data:", "blob:", "https:"],
+        "connect-src": ["'self'", "http://localhost:8080", "https://demotiles.maplibre.org"],
+        "img-src": ["'self'", "data:", "blob:", "https://demotiles.maplibre.org"],
         "style-src": ["'self'", "'unsafe-inline'", "https://unpkg.com"],
         "script-src": ["'self'", "https://unpkg.com"],
         "font-src": ["'self'", "data:"]
