@@ -23,7 +23,7 @@ function storageKey(organizationId: string) {
   return `agrocontrol.operational-scope.${organizationId}`;
 }
 
-function parseStoredScope(value: string | null): OperationalScope | null {
+export function parseStoredScope(value: string | null): OperationalScope | null {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as OperationalScope;
@@ -37,7 +37,7 @@ function parseStoredScope(value: string | null): OperationalScope | null {
   return null;
 }
 
-function isValidScope(scope: OperationalScope, access: FarmAccessScope, farms: Farm[], regions: OperationalRegion[]) {
+export function isValidScope(scope: OperationalScope, access: FarmAccessScope, farms: Farm[], regions: OperationalRegion[]) {
   switch (scope.kind) {
     case 'all': return access.allFarms;
     case 'farm': return farms.some(farm => farm.id === scope.farmId);
@@ -46,10 +46,21 @@ function isValidScope(scope: OperationalScope, access: FarmAccessScope, farms: F
   }
 }
 
-function fallbackScope(access: FarmAccessScope, farms: Farm[]): OperationalScope {
+export function fallbackScope(access: FarmAccessScope, farms: Farm[]): OperationalScope {
   if (access.allFarms) return { kind: 'all' };
   if (farms[0]) return { kind: 'farm', farmId: farms[0].id };
   return { kind: 'all' };
+}
+
+export function filterFarmsByScope(farms: Farm[], scope: OperationalScope) {
+  return farms.filter(farm => {
+    switch (scope.kind) {
+      case 'all': return true;
+      case 'farm': return farm.id === scope.farmId;
+      case 'region': return farm.operationalRegionId === scope.regionId;
+      case 'state': return (farm.stateCode ?? farm.state)?.toUpperCase() === scope.stateCode.toUpperCase();
+    }
+  });
 }
 
 export function FarmScopeProvider({ children }: PropsWithChildren) {
@@ -105,14 +116,7 @@ export function FarmScopeProvider({ children }: PropsWithChildren) {
     sessionStorage.setItem(storageKey(platform.organization.id), JSON.stringify(scope));
   }, [platform?.organization.id, access, farms, regions]);
 
-  const scopedFarms = useMemo(() => farms.filter(farm => {
-    switch (selected.kind) {
-      case 'all': return true;
-      case 'farm': return farm.id === selected.farmId;
-      case 'region': return farm.operationalRegionId === selected.regionId;
-      case 'state': return (farm.stateCode ?? farm.state)?.toUpperCase() === selected.stateCode.toUpperCase();
-    }
-  }), [farms, selected]);
+  const scopedFarms = useMemo(() => filterFarmsByScope(farms, selected), [farms, selected]);
 
   const scopeLabel = useMemo(() => {
     switch (selected.kind) {
