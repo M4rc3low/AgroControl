@@ -159,6 +159,24 @@
 - [x] testes unitários e integração PostgreSQL;
 - [x] documentação da Sprint 12.
 
+## Sprint 13 — Exportação ✅
+
+- [x] pedidos de exportação isolados por organização e número único por tenant;
+- [x] comprador, país ISO alpha-2, produto, quantidade e unidade;
+- [x] vínculo opcional e consistente com Farm, Field, Crop e Season;
+- [x] moeda ISO 4217, preço unitário e snapshot de câmbio para BRL;
+- [x] Incoterms e regras explícitas de transição de status;
+- [x] timeline operacional append-only;
+- [x] origem, destino, shipment, booking e container;
+- [x] checklist documental e metadados de emissão;
+- [x] custos logísticos com moeda e snapshot cambial;
+- [x] resumo por período, status, país e moeda;
+- [x] interface web responsiva para pedidos, documentos, timeline e custos;
+- [x] API protegida pelo entitlement `Export` e isolamento multi-tenant;
+- [x] migration `ExportCore` e índices;
+- [x] testes unitários e integração PostgreSQL;
+- [x] documentação da Sprint 13.
+
 ## Próximos aprimoramentos
 
-O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para exportação e logística comercial, importação de geometrias, imagens de satélite/drone, índices vegetativos, zonas de manejo e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.
+O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para CRM/comercial, importação de geometrias, imagens de satélite/drone, índices vegetativos, zonas de manejo e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.
