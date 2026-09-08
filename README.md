@@ -2,20 +2,29 @@
 
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência e processamento científico, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 17 concluída em desenvolvimento — processamento raster, GeoTIFF/COG e estatísticas zonais por talhão e zona de manejo**
+> Status atual: **Sprint 18 concluída — operação multi-fazenda, gestão regional, autorização horizontal e visão consolidada**  
+> API: **0.18.0**
 
 ## Objetivo
 
-Centralizar os principais fluxos de uma operação rural em uma única plataforma, mantendo isolamento multi-tenant e liberando funcionalidades por plano no backend.
+Centralizar os principais fluxos de uma operação rural em uma única plataforma, mantendo:
+
+- isolamento multi-tenant por organização;
+- escopo operacional por fazenda/região;
+- módulos liberados por plano no backend;
+- dados espaciais e operacionais integrados;
+- serviços especializados somente quando existe uma fronteira técnica clara.
 
 Hoje o AgroControl cobre:
 
-- propriedades, talhões, culturas e safras;
+- propriedades, regiões operacionais, talhões, culturas e safras;
+- operação multi-fazenda em diferentes estados e fusos horários;
+- acesso `AllFarms`, por região e por fazenda;
 - limites geográficos, GeoJSON, PostGIS e zonas de manejo;
 - cenas de satélite/drone, footprints e índices vegetativos;
 - processamento raster com Rasterio/NumPy e estatísticas zonais;
 - estoque e movimentações de insumos;
-- custos, receitas e rentabilidade;
+- custos, receitas, fluxo de caixa e rentabilidade;
 - máquinas, horímetro, combustível e manutenção;
 - commodities, cotações e alertas de mercado;
 - previsão de produtividade e apoio à decisão;
@@ -23,7 +32,8 @@ Hoje o AgroControl cobre:
 - irrigação, umidade do solo e aplicações de água;
 - sustentabilidade e indicadores gerenciais de CO₂e;
 - exportação, câmbio, documentação e logística;
-- clientes, contatos, oportunidades e pipeline comercial.
+- clientes, contatos, oportunidades e pipeline comercial;
+- dashboard e mapa multi-fazenda.
 
 Os módulos são liberados por plano e o bloqueio é validado no backend, não apenas na interface.
 
@@ -67,100 +77,125 @@ flowchart TB
     TEMPO --> GRAFANA
 ```
 
-A API concentra identidade, assinatura, autorização, `OrganizationId` e regras transacionais. Python é reservado para análise/modelagem e processamento científico. Java é usado para ingestão e histórico de telemetria. O banco principal não recebe raster pesado de satélite/drone: guarda metadados, referências de assets, lifecycle de processamento e estatísticas derivadas.
+A API concentra identidade, assinatura, autorização, `OrganizationId`, escopo operacional por fazenda e regras transacionais. Python é reservado para análise/modelagem e processamento científico. Java é usado para ingestão e histórico de telemetria.
 
-## Funcionalidades implementadas
+O banco principal não recebe raster pesado de satélite/drone: guarda metadados, referências de assets, lifecycle de processamento e estatísticas derivadas.
 
-### AgroControl Web
+## Multi-tenancy e operação multi-fazenda
+
+A Sprint 18 introduziu uma segunda fronteira de autorização dentro da organização:
+
+```text
+OrganizationId — fronteira máxima do tenant
+      │
+      └── FarmAccessScope
+              ├── AllFarms
+              ├── Region
+              └── Farm
+```
+
+Uma organização pode operar várias propriedades sem criar tenants separados:
+
+```text
+Organization
+├── OperationalRegion
+│   ├── Farm A
+│   │   ├── Field
+│   │   └── Season
+│   └── Farm B
+└── Farm C
+```
+
+O papel organizacional (`Owner`, `Admin`, `Manager`, `Viewer`) e o escopo de fazenda são conceitos diferentes. O backend resolve o escopo efetivo por request e protege dados vinculados às propriedades autorizadas.
+
+A proteção horizontal é aplicada em:
+
+- produção rural;
+- estoque;
+- financeiro;
+- máquinas;
+- irrigação;
+- sustentabilidade;
+- exportação;
+- comercial;
+- agricultura de precisão;
+- sensoriamento remoto;
+- raster;
+- telemetria vinculada a Farm/Field/Machine.
+
+Testes automatizados exercitam acesso **Fazenda A × Fazenda B dentro da mesma organização** para impedir vazamento por listagem, ID direto, contagens ou entidades-filhas.
+
+## AgroControl Web
 
 - registro, login, logout e sessão JWT;
 - contexto de organização, papel, plano e entitlements;
+- contexto operacional persistido durante a sessão;
+- seletor `Todas / Região / UF / Fazenda`;
 - app shell responsivo com sidebar/topbar;
-- dashboard operacional;
+- dashboard operacional e executivo multi-fazenda;
+- mapa MapLibre com propriedades acessíveis e `fitBounds`;
 - CRUD de produção rural;
-- Agricultura de Precisão com MapLibre, limites e zonas de manejo;
-- workspace de sensoriamento remoto com cenas, filtros, linha do tempo, footprints, latest metrics e gráficos temporais;
-- painel de processamento raster com disparo, status, metadados e comparação entre talhão e zonas;
+- Agricultura de Precisão com limites e zonas de manejo;
+- workspace de sensoriamento remoto;
+- painel de processamento raster;
 - irrigação, sustentabilidade, exportação e Comercial/CRM;
 - estados de loading, vazio, erro e módulo bloqueado;
 - proxy reverso same-origin no Nginx.
 
 O frontend melhora a experiência, mas **não substitui as validações de autorização do backend**.
 
-### Plataforma, identidade e multi-tenancy
+## Produção rural e localização
 
-- `Organization`, `User` e membership usuário-organização;
-- papéis `Owner`, `Admin`, `Manager` e `Viewer`;
-- JWT e hash PBKDF2-HMAC-SHA512 com salt aleatório;
-- planos `Basic`, `Pro`, `Intelligence` e `Enterprise`;
-- entitlements e overrides por organização;
-- isolamento por `OrganizationId` em repositórios e queries.
-
-### Produção rural
-
-- propriedades (`Farm`), talhões (`Field`), culturas (`Crop`) e safras (`Season`);
+- propriedades (`Farm`), regiões (`OperationalRegion`), talhões (`Field`), culturas (`Crop`) e safras (`Season`);
 - CRUD, soft delete, filtros e paginação;
 - validações de área, datas e produtividade;
-- produtividade esperada e realizada por hectare.
+- produtividade esperada e realizada por hectare;
+- localização estruturada com país, UF, município, CEP e coordenadas opcionais;
+- timezone IANA por propriedade.
 
-### Agricultura de precisão e geoespacial
+Eventos técnicos permanecem em UTC. A apresentação operacional usa o timezone da fazenda selecionada. A suíte cobre cenários SP × MT × AM × AC.
+
+## Agricultura de precisão, sensoriamento remoto e raster
 
 - PostGIS no banco principal;
-- limite opcional do talhão como `geography(Polygon,4326)`;
-- GeoJSON WGS84, validação topológica e índice GiST;
+- limites de talhão em WGS84/SRID 4326;
+- GeoJSON, validação topológica e índice GiST;
 - cálculo geodésico de área;
-- comparação entre área espacial e cadastral sem alteração silenciosa;
 - zonas `Soil`, `Yield`, `Vegetation`, `Prescription` e `Custom`;
-- importação de `Feature`/`FeatureCollection` com limite de 250 features;
-- importação em lote transacional;
-- contenção de zona no talhão com tolerância técnica documentada de 0,5 m;
-- exportação `FeatureCollection`;
-- camadas MapLibre com pré-visualização e controle de visibilidade.
-
-### Sensoriamento remoto e raster
-
+- importação/exportação GeoJSON;
 - cenas `Satellite`, `Drone` e `Other`;
-- Field obrigatório e Season opcional, sempre no mesmo tenant;
-- provedor e identificador externo com unicidade `(OrganizationId, Provider, ExternalId)`;
-- aquisição UTC, cobertura de nuvens, resolução espacial, referência externa do asset e observações;
-- footprint opcional `geography(Polygon,4326)` com índice GiST;
-- desativação lógica de cenas para preservar histórico;
-- observações append-only de `NDVI`, `NDRE`, `EVI` e `Custom`;
-- mínimo, máximo, média, mediana, desvio-padrão, cobertura válida e amostras/pixels;
-- vínculo opcional com zona de manejo do mesmo talhão;
-- snapshot de fonte e data da cena em cada observação;
-- séries temporais por talhão, safra, zona e índice;
-- resumo com índice mais recente e contagem de cenas;
-- rota web `/precision/remote-sensing` com cards, timeline, gráfico temporal, mapa e processamento raster;
-- motor Python com Rasterio + NumPy para GeoTIFF/COG;
-- reprojeção de geometrias, máscara, NoData e estatísticas zonais;
-- processamento do talhão e das zonas de manejo ativas;
+- NDVI, NDRE, EVI e índices customizados;
+- séries temporais e latest metrics;
+- Rasterio + NumPy para GeoTIFF/COG;
+- reprojeção, máscara, NoData e estatísticas zonais;
+- processamento de talhão e zonas de manejo;
 - lifecycle `Pending`, `Processing`, `Succeeded` e `Failed`;
-- idempotência por chave de processamento e persistência transacional;
-- limites MVP de 20 milhões de pixels e 250 geometrias por processamento;
-- assets remotos desabilitados por padrão e validações contra referências inseguras.
+- idempotência por chave de processamento;
+- limites MVP de 20 milhões de pixels e 250 geometrias;
+- assets remotos desabilitados por padrão.
 
-NDVI, NDRE e EVI são **indicadores de sensoriamento remoto para apoio à decisão**. O AgroControl não os transforma automaticamente em diagnóstico de doença, praga, deficiência nutricional, estresse hídrico ou produtividade.
+NDVI, NDRE, EVI, previsões e resultados raster são **apoio à decisão** e não diagnóstico agronômico automático nem garantia de produtividade.
 
-O raster pesado permanece fora do PostgreSQL principal. O serviço Python calcula os resultados científicos, enquanto a API C# mantém autorização, contexto produtivo, `OrganizationId`, idempotência e persistência.
-
-### Estoque e financeiro
+## Estoque e financeiro
 
 - categorias, itens, SKU, depósitos, lotes e validade;
 - movimentações append-only e bloqueio de saldo negativo;
-- consumo relacionado a propriedade/talhão/safra;
+- vínculos com propriedade/talhão/safra;
 - categorias financeiras e centros de custo;
 - despesas, receitas, contas a pagar/receber;
-- competência, caixa, resultado, margem, custo/ha, custo/unidade e ponto de equilíbrio.
+- competência, caixa, resultado, margem, custo/ha, custo/unidade e ponto de equilíbrio;
+- consolidação multi-fazenda em BRL sem média indevida de percentuais.
 
-### Máquinas e mercado
+Agregações que não possuem unidade/moeda compatível não são combinadas artificialmente.
+
+## Máquinas e mercado
 
 - máquinas, implementos, horímetro, combustível e manutenção;
 - custos por máquina e manutenção preventiva/corretiva;
 - commodities, histórico de cotações, variação e alertas de preço;
 - contrato preparado para provedores externos de mercado.
 
-### AgroControl Intelligence
+## AgroControl Intelligence
 
 - FastAPI independente;
 - contrato HTTP versionado `v1`;
@@ -169,13 +204,9 @@ O raster pesado permanece fora do PostgreSQL principal. O serviço Python calcul
 - MAE/RMSE quando existe histórico suficiente;
 - retorno `insufficient_data` quando não há base confiável;
 - Rasterio + NumPy para estatísticas zonais;
-- GeoTIFF/COG, reprojeção de CRS, máscara e NoData;
-- contrato interno `POST /api/v1/raster/zonal-statistics`;
 - cliente HTTP C# com timeout e tratamento de indisponibilidade.
 
-A previsão e os produtos raster são apoio à decisão e não garantia de produtividade ou diagnóstico agronômico automático.
-
-### AgroControl Telemetry
+## AgroControl Telemetry
 
 - Java 21 + Spring Boot com PostgreSQL próprio;
 - dispositivos por organização e vínculos com máquina/propriedade/talhão;
@@ -183,9 +214,10 @@ A previsão e os produtos raster são apoio à decisão e não garantia de produ
 - última leitura e histórico por métrica/período;
 - MQTT QoS 1 no tópico `agrocontrol/v1/devices/{deviceId}/telemetry`;
 - API interna serviço-a-serviço;
-- endpoints externos protegidos por JWT + entitlement `Telemetry`.
+- endpoints externos protegidos por JWT + entitlement `Telemetry`;
+- fachada C# que aplica o escopo operacional antes do acesso ao serviço Java.
 
-### Irrigação
+## Irrigação
 
 - zonas de irrigação, método, área e limites de umidade;
 - leitura canônica `soil_moisture_percent` no Telemetry;
@@ -193,7 +225,7 @@ A previsão e os produtos raster são apoio à decisão e não garantia de produ
 - aplicações de água append-only e volume estimado;
 - nenhuma atuação automática em bombas, pivôs ou válvulas.
 
-### Sustentabilidade
+## Sustentabilidade
 
 - fatores de emissão e atividades append-only;
 - snapshot de fatores;
@@ -203,24 +235,30 @@ A previsão e os produtos raster são apoio à decisão e não garantia de produ
 
 Os indicadores são estimativas gerenciais. O AgroControl não certifica inventários nem créditos de carbono.
 
-### Exportação e Comercial
+## Exportação e Comercial
 
 - pedidos internacionais, moedas, snapshots de câmbio e Incoterms;
 - timeline, logística, custos e checklist documental;
 - clientes, contatos e oportunidades;
-- pipeline comercial, probabilidade e resumo separado por moeda.
+- pipeline comercial, probabilidade e resumo separado por moeda;
+- normalização de vínculos Farm/Season/ExportOrder para manter o escopo horizontal.
 
 Esses módulos são gerenciais e não substituem emissão fiscal, Siscomex, despacho aduaneiro, contrato ou contabilidade oficial.
 
-### DevOps e observabilidade
+## Planos e módulos
 
-- OpenTelemetry na API C#, Intelligence Python e Telemetry Java;
-- Prometheus, Tempo e Grafana;
-- liveness/readiness;
-- pipelines independentes e Platform CI integrado;
-- Dependabot e CodeQL;
-- imagens GHCR com SHA/SemVer, provenance e SBOM;
-- Kubernetes + Kustomize com probes, resources, security context e PDB.
+O catálogo canônico de acesso está no backend em `PlanEntitlementCatalog`.
+
+Resumo:
+
+- **Basic:** identidade, organização, produção, estoque e financeiro;
+- **Pro:** Basic + máquinas, mercado, agricultura de precisão, irrigação, sustentabilidade e comercial;
+- **Intelligence:** Pro + Intelligence e Telemetry;
+- **Enterprise:** todos os módulos, incluindo Export.
+
+Overrides por organização podem habilitar/desabilitar módulos individualmente.
+
+Veja [`docs/MODULES.md`](docs/MODULES.md).
 
 ## Executando localmente
 
@@ -273,11 +311,20 @@ GET  /api/v1/platform/entitlements
 /api/v1/fields
 /api/v1/crops
 /api/v1/seasons
+
+GET    /api/v1/operations/regions
+POST   /api/v1/operations/regions
+GET    /api/v1/operations/farm-access/me
+GET    /api/v1/operations/farm-access/users/{userId}
+POST   /api/v1/operations/farm-access
+DELETE /api/v1/operations/farm-access/{assignmentId}
+
 /api/v1/precision/*
 /api/v1/precision/remote-sensing/*
 POST /api/v1/precision/remote-sensing/scenes/{sceneId}/process
 GET  /api/v1/precision/remote-sensing/scenes/{sceneId}/processings
 GET  /api/v1/precision/remote-sensing/processing-results
+
 /api/v1/irrigation/*
 /api/v1/sustainability/*
 /api/v1/export/*
@@ -291,8 +338,6 @@ POST /api/v1/intelligence/seasons/{seasonId}/yield-prediction
 ```
 
 ## Kubernetes
-
-A base fica em `k8s/` e pode ser renderizada com:
 
 ```bash
 kubectl kustomize k8s/base
@@ -311,9 +356,12 @@ Segredos reais não entram no repositório.
 - **CodeQL:** C#, Java/Kotlin, Python e JavaScript/TypeScript;
 - **Dependabot:** NuGet, pip, Maven, npm e GitHub Actions.
 
+A Sprint 18 foi mesclada somente depois de **Backend CI + Frontend CI + Platform CI + CodeQL** ficarem verdes no mesmo head do PR #51.
+
 ## Documentação
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/DOMAIN.md`](docs/DOMAIN.md)
 - [`docs/MODULES.md`](docs/MODULES.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - [`docs/SPRINT_6_INTELLIGENCE.md`](docs/SPRINT_6_INTELLIGENCE.md)
@@ -328,6 +376,7 @@ Segredos reais não entram no repositório.
 - [`docs/SPRINT_15_GEOSPATIAL_ZONES.md`](docs/SPRINT_15_GEOSPATIAL_ZONES.md)
 - [`docs/SPRINT_16_REMOTE_SENSING.md`](docs/SPRINT_16_REMOTE_SENSING.md)
 - [`docs/SPRINT_17_RASTER_PROCESSING.md`](docs/SPRINT_17_RASTER_PROCESSING.md)
+- [`docs/SPRINT_18_MULTI_FARM.md`](docs/SPRINT_18_MULTI_FARM.md)
 
 ## Roadmap resumido
 
@@ -348,7 +397,8 @@ Segredos reais não entram no repositório.
 15. ✅ Sprint 14 — Comercial/CRM.
 16. ✅ Sprint 15 — importação GeoJSON e zonas de manejo.
 17. ✅ Sprint 16 — sensoriamento remoto e índices vegetativos.
-18. 🚀 Sprint 17 — processamento raster e estatísticas zonais.
+18. ✅ Sprint 17 — processamento raster e estatísticas zonais.
+19. ✅ Sprint 18 — operação multi-fazenda, gestão regional e autorização horizontal.
 
 O hardening dependente de ambiente real, política operacional ou testes de carga permanece separado no issue **#18**.
 
@@ -356,11 +406,11 @@ O hardening dependente de ambiente real, política operacional ou testes de carg
 
 Defaults do repositório são apenas de desenvolvimento. Em produção, `JWT_KEY`, `TELEMETRY_INTERNAL_API_KEY`, credenciais de banco e credenciais/certificados MQTT devem vir de secrets management apropriado.
 
-O mapa usa URLs configuráveis. Credenciais de provedores de tiles/imagens não devem ser tratadas como segredo confiável quando expostas ao navegador. Integrações futuras com provedores autenticados devem manter segredos no backend/secret manager.
+O mapa usa URLs configuráveis. Credenciais de provedores de tiles/imagens não devem ser tratadas como segredo confiável quando expostas ao navegador.
 
-Assets raster remotos permanecem desabilitados por padrão no Intelligence. Quando habilitados, devem ser combinados em produção com allowlists, egress control e credenciais gerenciadas; referências remotas não devem transportar credenciais na URL.
+Assets raster remotos permanecem desabilitados por padrão. Quando habilitados, devem ser combinados em produção com allowlists, egress control e credenciais gerenciadas; referências remotas não devem transportar credenciais na URL.
 
-O JWT do frontend usa `sessionStorage` por compatibilidade com o contrato bearer atual. A evolução para BFF/cookie HttpOnly pode ser adotada quando o modelo de exposição pública justificar esse endurecimento.
+O JWT do frontend usa `sessionStorage` por compatibilidade com o contrato bearer atual. Uma evolução para BFF/cookie HttpOnly pode ser adotada quando o modelo de exposição pública justificar esse endurecimento.
 
 ## Licença
 
