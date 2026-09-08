@@ -55,11 +55,18 @@ public sealed class RasterProcessingPersistenceTests
         var intelligence = new StubRasterIntelligenceClient(zone.Value!.Id);
         var service = new RasterProcessingService(remoteRepository, precisionRepository, rasterRepository, intelligence);
 
+        var assetOverride = await service.ProcessSceneAsync(orgA.Id, scene.Value!.Id,
+            new ProcessRasterSceneCommand("NDVI", null, "/data/other-tenant-or-unregistered.tif", 1, true, null));
+        Assert.False(assetOverride.Succeeded);
+        Assert.Equal(RasterProcessResultKind.Validation, assetOverride.Kind);
+
         var command = new ProcessRasterSceneCommand("NDVI", null, null, 1, true, "integration-raster-key");
-        var first = await service.ProcessSceneAsync(orgA.Id, scene.Value!.Id, command);
+        var first = await service.ProcessSceneAsync(orgA.Id, scene.Value.Id, command);
         Assert.True(first.Succeeded);
         Assert.False(first.Value!.Reused);
         Assert.Equal("Succeeded", first.Value.Run.Status);
+        Assert.Equal(64, first.Value.Run.ProcessingKey.Length);
+        Assert.NotEqual("integration-raster-key", first.Value.Run.ProcessingKey);
         Assert.Equal(2, first.Value.Results.Count);
         Assert.Contains(first.Value.Results, item => item.ManagementZoneId is null);
         Assert.Contains(first.Value.Results, item => item.ManagementZoneId == zone.Value.Id);
