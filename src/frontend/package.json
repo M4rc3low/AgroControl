@@ -12,8 +12,9 @@
     "test": "vitest run",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "desktop:dev": "cargo tauri dev",
-    "desktop:build": "cargo tauri build"
+    "desktop:icons": "npx --yes @tauri-apps/cli@2 icon public/icons/icon-512.png",
+    "desktop:dev": "npm run desktop:icons && npx --yes @tauri-apps/cli@2 dev",
+    "desktop:build": "npm run desktop:icons && npx --yes @tauri-apps/cli@2 build"
   },
   "dependencies": {
     "react": "19.2.8",
