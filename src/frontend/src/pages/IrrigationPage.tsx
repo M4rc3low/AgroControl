@@ -80,6 +80,10 @@ function conditionTone(condition: number | null | undefined): 'neutral' | 'succe
   return 'neutral';
 }
 
+function methodLabel(value: number) {
+  return methods.find(method => method.value === value)?.label ?? `Método ${value}`;
+}
+
 export function IrrigationPage() {
   const { platform } = useAuth();
   const allowed = Boolean(platform?.entitlements.modules.Irrigation);
@@ -91,6 +95,7 @@ export function IrrigationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoneModal, setZoneModal] = useState(false);
+  const [editingZone, setEditingZone] = useState<IrrigationZone | null>(null);
   const [applicationModal, setApplicationModal] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState('');
 
@@ -101,7 +106,7 @@ export function IrrigationPage() {
     try {
       const [fieldItems, zoneItems, applicationPage, summaryData] = await Promise.all([
         getAllPaged<Field>('/api/v1/fields'),
-        getAllPaged<IrrigationZone>('/api/v1/irrigation/zones'),
+        getAllPaged<IrrigationZone>('/api/v1/irrigation/zones?includeInactive=true'),
         apiRequest<PagedResult<IrrigationApplication>>('/api/v1/irrigation/applications?page=1&pageSize=50'),
         apiRequest<IrrigationSummary>('/api/v1/irrigation/summary')
       ]);
@@ -139,12 +144,23 @@ export function IrrigationPage() {
   const fieldNames = useMemo(() => Object.fromEntries(fields.map(field => [field.id, field.name])), [fields]);
   const zoneNames = useMemo(() => Object.fromEntries(zones.map(zone => [zone.id, zone.name])), [zones]);
 
+  async function deactivateZone(zone: IrrigationZone) {
+    if (!window.confirm(`Desativar a zona ${zone.name}? O histórico de aplicações será preservado.`)) return;
+    setError(null);
+    try {
+      await apiRequest<void>(`/api/v1/irrigation/zones/${zone.id}`, { method: 'DELETE' });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível desativar a zona.');
+    }
+  }
+
   if (!allowed) return <EmptyState title="Irrigação não disponível no plano" description="O módulo existe na plataforma, mas o acesso depende do entitlement Irrigation da sua organização." />;
   if (loading && zones.length === 0) return <Spinner label="Carregando manejo hídrico" />;
   if (error && zones.length === 0) return <EmptyState title="Irrigação indisponível" description={error} action={<Button onClick={() => void load()}><Icon name="refresh" size={16} /> Tentar novamente</Button>} />;
 
   return <div className="page-stack irrigation-page">
-    <PageHeader eyebrow="Manejo hídrico" title="Irrigação" description="Acompanhe zonas, umidade do solo e aplicações de água. As recomendações apoiam a decisão e não acionam equipamentos automaticamente." actions={<div className="irrigation-actions"><Button variant="secondary" onClick={() => void load()}><Icon name="refresh" size={16} /> Atualizar</Button><Button onClick={() => setZoneModal(true)}><Icon name="plus" size={16} /> Nova zona</Button></div>} />
+    <PageHeader eyebrow="Manejo hídrico" title="Irrigação" description="Acompanhe zonas, umidade do solo e aplicações de água. As recomendações apoiam a decisão e não acionam equipamentos automaticamente." actions={<div className="irrigation-actions"><Button variant="secondary" onClick={() => void load()}><Icon name="refresh" size={16} /> Atualizar</Button><Button onClick={() => { setEditingZone(null); setZoneModal(true); }}><Icon name="plus" size={16} /> Nova zona</Button></div>} />
     {error && <div className="inline-warning">{error}</div>}
 
     <div className="irrigation-metrics">
@@ -158,11 +174,11 @@ export function IrrigationPage() {
       {zones.length === 0 ? <EmptyState title="Nenhuma zona cadastrada" description="Crie a primeira zona para organizar limites de umidade e aplicações de água." /> : <div className="irrigation-zone-grid">{zones.map(zone => {
         const status = statuses[zone.id];
         return <Card key={zone.id} className={!zone.isActive ? 'irrigation-zone irrigation-zone--inactive' : 'irrigation-zone'}>
-          <div className="irrigation-zone__head"><div><strong>{zone.name}</strong><small>{fieldNames[zone.fieldId] ?? 'Talhão'} · {zone.areaHectares.toLocaleString('pt-BR')} ha</small></div><Badge tone={zone.isActive ? 'success' : 'neutral'}>{zone.isActive ? 'Ativa' : 'Inativa'}</Badge></div>
+          <div className="irrigation-zone__head"><div><strong>{zone.name}</strong><small>{fieldNames[zone.fieldId] ?? 'Talhão'} · {zone.areaHectares.toLocaleString('pt-BR')} ha · {methodLabel(zone.method)}</small></div><Badge tone={zone.isActive ? 'success' : 'neutral'}>{zone.isActive ? 'Ativa' : 'Inativa'}</Badge></div>
           <div className="irrigation-moisture"><span>Umidade do solo</span><strong>{status?.soilMoisturePercent != null ? `${status.soilMoisturePercent.toLocaleString('pt-BR')}%` : '—'}</strong><Badge tone={conditionTone(status?.condition)}>{status?.condition != null ? conditionLabels[status.condition] ?? 'Sem leitura' : 'Sem leitura'}</Badge></div>
-          <p>{status?.message ?? 'Consultando telemetria...'}</p>
+          <p>{zone.isActive ? status?.message ?? 'Consultando telemetria...' : 'Zona desativada. O histórico permanece disponível para consulta.'}</p>
           <div className="irrigation-thresholds"><span>mín. {zone.minimumMoisturePercent}%</span><span>alvo {zone.targetMoisturePercent}%</span><span>máx. {zone.maximumMoisturePercent}%</span></div>
-          {zone.isActive && <Button variant="secondary" onClick={() => { setSelectedZoneId(zone.id); setApplicationModal(true); }}>Registrar aplicação</Button>}
+          {zone.isActive && <div className="irrigation-zone__actions"><Button variant="secondary" onClick={() => { setSelectedZoneId(zone.id); setApplicationModal(true); }}>Registrar aplicação</Button><Button variant="ghost" onClick={() => { setEditingZone(zone); setZoneModal(true); }}><Icon name="edit" size={15} /> Editar</Button><Button variant="danger" onClick={() => void deactivateZone(zone)}><Icon name="trash" size={15} /> Desativar</Button></div>}
         </Card>;
       })}</div>}
     </section>
@@ -172,12 +188,12 @@ export function IrrigationPage() {
       {applications.length === 0 ? <EmptyState title="Nenhuma aplicação registrada" description="As aplicações reais aparecerão aqui sem reescrever o histórico." /> : <div className="table-wrap"><table><thead><tr><th>Data</th><th>Zona</th><th>Lâmina</th><th>Volume estimado</th><th>Origem</th></tr></thead><tbody>{applications.map(item => <tr key={item.id}><td>{new Date(item.startedAtUtc).toLocaleString('pt-BR')}</td><td>{zoneNames[item.zoneId] ?? item.zoneId.slice(0, 8)}</td><td>{item.depthMillimeters.toLocaleString('pt-BR')} mm</td><td>{item.estimatedVolumeCubicMeters.toLocaleString('pt-BR')} m³</td><td>{sourceLabels[item.source] ?? `Origem ${item.source}`}</td></tr>)}</tbody></table></div>}
     </section>
 
-    <ZoneModal open={zoneModal} fields={fields} onClose={() => setZoneModal(false)} onSaved={load} />
+    <ZoneModal key={editingZone?.id ?? 'new'} open={zoneModal} zone={editingZone} fields={fields} onClose={() => { setZoneModal(false); setEditingZone(null); }} onSaved={load} />
     <ApplicationModal open={applicationModal} zones={zones.filter(zone => zone.isActive)} selectedZoneId={selectedZoneId} onClose={() => { setApplicationModal(false); setSelectedZoneId(''); }} onSaved={load} />
   </div>;
 }
 
-function ZoneModal({ open, fields, onClose, onSaved }: { open: boolean; fields: Field[]; onClose(): void; onSaved(): Promise<void> }) {
+function ZoneModal({ open, zone, fields, onClose, onSaved }: { open: boolean; zone: IrrigationZone | null; fields: Field[]; onClose(): void; onSaved(): Promise<void> }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -185,29 +201,27 @@ function ZoneModal({ open, fields, onClose, onSaved }: { open: boolean; fields: 
     setSaving(true);
     setError(null);
     const form = new FormData(event.currentTarget);
+    const body = JSON.stringify({
+      fieldId: form.get('fieldId'),
+      name: form.get('name'),
+      areaHectares: Number(form.get('areaHectares')),
+      method: Number(form.get('method')),
+      minimumMoisturePercent: Number(form.get('minimum')),
+      targetMoisturePercent: Number(form.get('target')),
+      maximumMoisturePercent: Number(form.get('maximum')),
+      telemetryDeviceId: String(form.get('telemetryDeviceId') ?? '').trim() || null
+    });
     try {
-      await apiRequest('/api/v1/irrigation/zones', {
-        method: 'POST',
-        body: JSON.stringify({
-          fieldId: form.get('fieldId'),
-          name: form.get('name'),
-          areaHectares: Number(form.get('areaHectares')),
-          method: Number(form.get('method')),
-          minimumMoisturePercent: Number(form.get('minimum')),
-          targetMoisturePercent: Number(form.get('target')),
-          maximumMoisturePercent: Number(form.get('maximum')),
-          telemetryDeviceId: String(form.get('telemetryDeviceId') ?? '').trim() || null
-        })
-      });
+      await apiRequest(zone ? `/api/v1/irrigation/zones/${zone.id}` : '/api/v1/irrigation/zones', { method: zone ? 'PUT' : 'POST', body });
       onClose();
       await onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível criar a zona.');
+      setError(err instanceof Error ? err.message : `Não foi possível ${zone ? 'atualizar' : 'criar'} a zona.`);
     } finally {
       setSaving(false);
     }
   }
-  return <Modal open={open} title="Nova zona de irrigação" description="Configure área, método e faixas de umidade." onClose={onClose}><form className="form-grid" onSubmit={submit}>{error && <div className="inline-warning form-grid__full">{error}</div>}<label>Talhão<select name="fieldId" required>{fields.map(field => <option key={field.id} value={field.id}>{field.name} · {field.areaHectares} ha</option>)}</select></label><label>Nome<input name="name" required placeholder="Zona Norte" /></label><label>Área (ha)<input name="areaHectares" required type="number" min="0.0001" step="0.0001" /></label><label>Método<select name="method">{methods.map(method => <option key={method.value} value={method.value}>{method.label}</option>)}</select></label><label>Umidade mínima (%)<input name="minimum" type="number" min="0" max="100" step="0.1" defaultValue="35" /></label><label>Umidade alvo (%)<input name="target" type="number" min="0" max="100" step="0.1" defaultValue="50" /></label><label>Umidade máxima (%)<input name="maximum" type="number" min="0" max="100" step="0.1" defaultValue="75" /></label><label>Device ID de telemetria<input name="telemetryDeviceId" placeholder="opcional" /></label><div className="form-actions form-grid__full"><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={saving}>{saving ? 'Salvando...' : 'Criar zona'}</Button></div></form></Modal>;
+  return <Modal open={open} title={zone ? `Editar ${zone.name}` : 'Nova zona de irrigação'} description="Configure área, método e faixas de umidade." onClose={onClose}><form className="form-grid" onSubmit={submit}>{error && <div className="inline-warning form-grid__full">{error}</div>}<label>Talhão<select name="fieldId" required defaultValue={zone?.fieldId}>{fields.map(field => <option key={field.id} value={field.id}>{field.name} · {field.areaHectares} ha</option>)}</select></label><label>Nome<input name="name" required placeholder="Zona Norte" defaultValue={zone?.name} /></label><label>Área (ha)<input name="areaHectares" required type="number" min="0.0001" step="0.0001" defaultValue={zone?.areaHectares} /></label><label>Método<select name="method" defaultValue={zone?.method ?? 1}>{methods.map(method => <option key={method.value} value={method.value}>{method.label}</option>)}</select></label><label>Umidade mínima (%)<input name="minimum" type="number" min="0" max="100" step="0.1" defaultValue={zone?.minimumMoisturePercent ?? 35} /></label><label>Umidade alvo (%)<input name="target" type="number" min="0" max="100" step="0.1" defaultValue={zone?.targetMoisturePercent ?? 50} /></label><label>Umidade máxima (%)<input name="maximum" type="number" min="0" max="100" step="0.1" defaultValue={zone?.maximumMoisturePercent ?? 75} /></label><label>Device ID de telemetria<input name="telemetryDeviceId" placeholder="opcional" defaultValue={zone?.telemetryDeviceId ?? ''} /></label><div className="form-actions form-grid__full"><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={saving}>{saving ? 'Salvando...' : zone ? 'Salvar alterações' : 'Criar zona'}</Button></div></form></Modal>;
 }
 
 function ApplicationModal({ open, zones, selectedZoneId, onClose, onSaved }: { open: boolean; zones: IrrigationZone[]; selectedZoneId: string; onClose(): void; onSaved(): Promise<void> }) {
