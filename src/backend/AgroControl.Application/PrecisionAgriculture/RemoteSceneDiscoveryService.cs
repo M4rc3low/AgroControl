@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using AgroControl.Application.Common;
 using AgroControl.Application.Production;
@@ -20,9 +21,14 @@ public sealed class RemoteSceneDiscoveryService(
         SearchRemoteScenesCommand command,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         var context = await ValidateContextAsync(organizationId, command.FieldId, command.SeasonId, true, cancellationToken);
         if (!context.Succeeded)
-            return MapContextFailureToSearch(context);
+        {
+            var rejected = MapContextFailureToSearch(context);
+            RemoteSceneDiscoveryTelemetry.RecordSearch(command.Provider, rejected.Kind, stopwatch.Elapsed, 0);
+            return rejected;
+        }
 
         var request = new RemoteSceneDiscoverySearchRequest(
             command.Provider,
@@ -35,7 +41,7 @@ public sealed class RemoteSceneDiscoveryService(
             command.ContinuationToken);
 
         var result = await client.SearchAsync(request, cancellationToken);
-        return result.ErrorKind switch
+        var mapped = result.ErrorKind switch
         {
             RemoteSceneDiscoveryCallErrorKind.None when result.Value is not null =>
                 RemoteSceneDiscoverySearchResult.Success(result.Value),
@@ -49,6 +55,8 @@ public sealed class RemoteSceneDiscoveryService(
                 RemoteSceneDiscoverySearchResult.InvalidPayload(result.Error ?? "STAC provider returned an invalid payload."),
             _ => RemoteSceneDiscoverySearchResult.Unavailable(result.Error ?? "STAC search failed.")
         };
+        RemoteSceneDiscoveryTelemetry.RecordSearch(command.Provider, mapped.Kind, stopwatch.Elapsed, mapped.Value?.Items.Count ?? 0);
+        return mapped;
     }
 
     public async Task<RemoteSceneDiscoveryImportResult> ImportAsync(
@@ -58,14 +66,23 @@ public sealed class RemoteSceneDiscoveryService(
     {
         var context = await ValidateContextAsync(organizationId, command.FieldId, command.SeasonId, false, cancellationToken);
         if (!context.Succeeded)
-            return MapContextFailureToImport(context);
+        {
+            var rejected = MapContextFailureToImport(context);
+            RemoteSceneDiscoveryTelemetry.RecordImport(command.Provider, rejected.Kind);
+            return rejected;
+        }
 
         if (string.IsNullOrWhiteSpace(command.AssetKey))
-            return RemoteSceneDiscoveryImportResult.Validation("Asset key is required.");
+        {
+            var rejected = RemoteSceneDiscoveryImportResult.Validation("Asset key is required.");
+            RemoteSceneDiscoveryTelemetry.RecordImport(command.Provider, rejected.Kind);
+            return rejected;
+        }
 
         var external = await client.GetItemAsync(command.Provider, command.Collection, command.ExternalId, cancellationToken);
         if (!external.Succeeded || external.Value is null)
-            return external.ErrorKind switch
+        {
+            var failed = external.ErrorKind switch
             {
                 RemoteSceneDiscoveryCallErrorKind.Validation =>
                     RemoteSceneDiscoveryImportResult.Validation(external.Error ?? "STAC item request is invalid."),
@@ -77,12 +94,19 @@ public sealed class RemoteSceneDiscoveryService(
                     RemoteSceneDiscoveryImportResult.InvalidPayload(external.Error ?? "STAC item payload is invalid."),
                 _ => RemoteSceneDiscoveryImportResult.Unavailable(external.Error ?? "STAC provider is unavailable.")
             };
+            RemoteSceneDiscoveryTelemetry.RecordImport(command.Provider, failed.Kind);
+            return failed;
+        }
 
         var item = external.Value;
         var asset = item.Assets.FirstOrDefault(candidate =>
             candidate.Key.Equals(command.AssetKey.Trim(), StringComparison.Ordinal) && candidate.IsRasterCandidate);
         if (asset is null)
-            return RemoteSceneDiscoveryImportResult.Validation("Selected STAC asset is not an allowed raster candidate.");
+        {
+            var rejected = RemoteSceneDiscoveryImportResult.Validation("Selected STAC asset is not an allowed raster candidate.");
+            RemoteSceneDiscoveryTelemetry.RecordImport(command.Provider, rejected.Kind);
+            return rejected;
+        }
 
         var footprint = TryParsePolygon(item.GeometryGeoJson);
         var notes = $"Imported from STAC collection {item.Collection}; asset {asset.Key}.";
@@ -100,19 +124,20 @@ public sealed class RemoteSceneDiscoveryService(
             footprint);
 
         var created = await remoteSensingService.CreateSceneAsync(organizationId, create, cancellationToken);
-        if (created.Succeeded && created.Value is not null)
-            return RemoteSceneDiscoveryImportResult.Success(created.Value);
-
-        return created.ErrorKind switch
-        {
-            OperationErrorKind.Validation =>
-                RemoteSceneDiscoveryImportResult.Validation(created.Error ?? "Discovered scene could not be imported."),
-            OperationErrorKind.NotFound or OperationErrorKind.Forbidden =>
-                RemoteSceneDiscoveryImportResult.NotFound(created.Error ?? "Production context was not found."),
-            OperationErrorKind.Conflict =>
-                RemoteSceneDiscoveryImportResult.Conflict(created.Error ?? "The STAC scene was already imported."),
-            _ => RemoteSceneDiscoveryImportResult.Unavailable(created.Error ?? "Scene import failed.")
-        };
+        var mapped = created.Succeeded && created.Value is not null
+            ? RemoteSceneDiscoveryImportResult.Success(created.Value)
+            : created.ErrorKind switch
+            {
+                OperationErrorKind.Validation =>
+                    RemoteSceneDiscoveryImportResult.Validation(created.Error ?? "Discovered scene could not be imported."),
+                OperationErrorKind.NotFound or OperationErrorKind.Forbidden =>
+                    RemoteSceneDiscoveryImportResult.NotFound(created.Error ?? "Production context was not found."),
+                OperationErrorKind.Conflict =>
+                    RemoteSceneDiscoveryImportResult.Conflict(created.Error ?? "The STAC scene was already imported."),
+                _ => RemoteSceneDiscoveryImportResult.Unavailable(created.Error ?? "Scene import failed.")
+            };
+        RemoteSceneDiscoveryTelemetry.RecordImport(command.Provider, mapped.Kind);
+        return mapped;
     }
 
     private async Task<OperationResult<SpatialFieldSnapshot>> ValidateContextAsync(
