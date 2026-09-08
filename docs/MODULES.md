@@ -1,49 +1,81 @@
 # Catálogo de módulos
 
-## Estados
+## Fonte de verdade
 
-- **Active** — módulo disponível na fase atual.
-- **ComingSoon** — módulo já previsto na experiência do produto, ainda em implementação.
-- **Locked** — módulo planejado, inicialmente bloqueado por plano ou fase.
+Este documento descreve os módulos já implementados no AgroControl. A decisão de acesso por plano é aplicada no backend pelo `PlanEntitlementCatalog` e pode ser sobrescrita por entitlement específico da organização.
 
-## Catálogo
+A interface pode indicar um módulo como bloqueado, mas **a autorização real é sempre validada pela API**.
 
-| Módulo | Estado inicial | Escopo |
+## Módulos implementados
+
+| ModuleKey | Estado | Escopo principal |
 |---|---|---|
-| Identity | Active | Usuários, autenticação, papéis e acesso |
-| Organizations | Active | Empresas/grupos e escopo de tenant |
-| Farms | Active | Propriedades rurais |
-| Fields | Active | Talhões e áreas |
-| Crops | Active | Catálogo de culturas |
-| Seasons | Active | Safras e ciclos |
-| Inventory | Active | Insumos, entradas, saídas e saldo |
-| Finance | Active | Custos, receitas, margem e ponto de equilíbrio |
-| Machinery | ComingSoon | Máquinas, horímetro, combustível e manutenção |
-| Market | ComingSoon | Commodities, preços e alertas |
-| Precision Agriculture | Locked | Mapas, GPS, drone e georreferenciamento |
-| Agro Intelligence | Locked | Analytics, previsão, IA e visão computacional |
-| Irrigation | Locked | Umidade, chuva, clima e irrigação |
-| Sustainability | Locked | Carbono, emissões e indicadores ambientais |
-| Export | Locked | Pedidos, câmbio, documentos e logística |
-| Telemetry | Locked | IoT, sensores e telemetria de máquinas |
+| `Identity` | Active | usuários, autenticação e sessão |
+| `Organizations` | Active | organização, membership, papéis e tenant |
+| `Farms` | Active | propriedades, regiões operacionais e escopo multi-fazenda |
+| `Fields` | Active | talhões e áreas produtivas |
+| `Crops` | Active | catálogo de culturas |
+| `Seasons` | Active | safras e ciclos produtivos |
+| `Inventory` | Active | categorias, itens, depósitos, movimentações e saldo |
+| `Finance` | Active | despesas, receitas, caixa, resultado e rentabilidade |
+| `Machinery` | Active | máquinas, horímetro, combustível e manutenção |
+| `Market` | Active | commodities, cotações e alertas |
+| `PrecisionAgriculture` | Active | PostGIS, GeoJSON, zonas, sensoriamento remoto e raster |
+| `Intelligence` | Active | previsão, analytics e processamento científico Python |
+| `Irrigation` | Active | zonas de irrigação, umidade e aplicações de água |
+| `Sustainability` | Active | fatores, emissões e indicadores gerenciais de CO₂e |
+| `Commercial` | Active | clientes, contatos, oportunidades e pipeline |
+| `Export` | Active | pedidos, câmbio, documentos, custos e logística |
+| `Telemetry` | Active | dispositivos, MQTT, última leitura e histórico |
 
-## Planos — proposta inicial
+Todos os `ModuleKey` acima possuem implementação real no produto. `Locked` na experiência significa ausência de entitlement para aquela organização/plano, e não ausência de código.
 
-Os nomes ainda são provisórios.
+## Capacidades transversais
 
-| Módulo | Basic | Pro | Intelligence | Enterprise |
+Algumas capacidades não possuem `ModuleKey` próprio porque fazem parte de uma fronteira existente:
+
+- **Operação multi-fazenda / regiões / acesso por Farm** — protegida pelo módulo `Farms`;
+- **Sensoriamento remoto** — protegido por `PrecisionAgriculture`;
+- **Processamento raster e estatísticas zonais** — protegido por `PrecisionAgriculture`, com processamento científico no serviço Intelligence;
+- **Observabilidade / DevOps** — capacidade de plataforma, não módulo comercial;
+- **Autorização horizontal** — regra transversal aplicada sobre os módulos ligados a propriedades.
+
+## Planos atuais
+
+A tabela abaixo reflete o `PlanEntitlementCatalog` do backend.
+
+| Módulo / capacidade | Basic | Pro | Intelligence | Enterprise |
 |---|:---:|:---:|:---:|:---:|
-| Produção | ✅ | ✅ | ✅ | ✅ |
+| Identity / Organizations | ✅ | ✅ | ✅ | ✅ |
+| Produção — Farms / Fields / Crops / Seasons | ✅ | ✅ | ✅ | ✅ |
 | Estoque | ✅ | ✅ | ✅ | ✅ |
 | Financeiro | ✅ | ✅ | ✅ | ✅ |
-| Máquinas |  | ✅ | ✅ | ✅ |
-| Mercado |  | ✅ | ✅ | ✅ |
-| Agricultura de precisão |  | ✅ | ✅ | ✅ |
-| IA / Analytics |  |  | ✅ | ✅ |
-| IoT / Telemetria |  |  | ✅ | ✅ |
-| Sustentabilidade |  |  | ✅ | ✅ |
-| Exportação |  |  |  | ✅ |
+| Máquinas | — | ✅ | ✅ | ✅ |
+| Mercado | — | ✅ | ✅ | ✅ |
+| Agricultura de Precisão | — | ✅ | ✅ | ✅ |
+| Irrigação | — | ✅ | ✅ | ✅ |
+| Sustentabilidade | — | ✅ | ✅ | ✅ |
+| Comercial / CRM | — | ✅ | ✅ | ✅ |
+| Intelligence | — | — | ✅ | ✅ |
+| Telemetry / IoT | — | — | ✅ | ✅ |
+| Exportação | — | — | — | ✅ |
 
-## Regra de segurança
+`Enterprise` inclui todos os `ModuleKey` atuais. Overrides por organização podem habilitar ou desabilitar módulos individualmente conforme a política de assinatura.
 
-A flag visual de bloqueio não é segurança. O backend deverá validar entitlement antes de executar o caso de uso protegido.
+## Segurança
+
+O catálogo visual do frontend não é uma fronteira de segurança.
+
+Para um caso de uso protegido, a API deve verificar cumulativamente quando aplicável:
+
+1. autenticação do usuário;
+2. `OrganizationId` do tenant;
+3. entitlement do módulo;
+4. papel administrativo quando a operação exigir;
+5. `FarmAccessScope` quando o recurso estiver vinculado a uma propriedade.
+
+A Sprint 18 acrescentou a quinta dimensão sem substituir as anteriores.
+
+## Estado atual
+
+Catálogo sincronizado com a plataforma até a **Sprint 18 / API 0.18.0**.
