@@ -1,5 +1,9 @@
+function isDesktopShell() {
+  return window.location.hostname === 'tauri.localhost' || window.location.protocol === 'tauri:';
+}
+
 export function registerPwa() {
-  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  if (!import.meta.env.PROD || isDesktopShell() || !('serviceWorker' in navigator)) return;
 
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
