@@ -20,6 +20,7 @@ public sealed class ModuleCatalog : IModuleCatalog
         new(ModuleKey.Intelligence, "Agro Intelligence", ModuleStatus.Active, "Análise de dados, previsão e IA."),
         new(ModuleKey.Irrigation, "Irrigation", ModuleStatus.Active, "Zonas de irrigação, umidade do solo e manejo hídrico."),
         new(ModuleKey.Sustainability, "Sustainability", ModuleStatus.Active, "Emissões estimadas, CO₂e e indicadores ambientais."),
+        new(ModuleKey.Commercial, "Commercial", ModuleStatus.Active, "Clientes, contatos, oportunidades e pipeline comercial."),
         new(ModuleKey.Export, "Export", ModuleStatus.Active, "Pedidos internacionais, câmbio, documentos e logística."),
         new(ModuleKey.Telemetry, "Telemetry", ModuleStatus.Active, "Sensores, GPS, máquinas e IoT.")
     ];

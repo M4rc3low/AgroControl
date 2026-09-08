@@ -4,6 +4,7 @@ using AgroControl.Api.Auth;
 using AgroControl.Api.Endpoints;
 using AgroControl.Api.Health;
 using AgroControl.Application.Finance;
+using AgroControl.Application.Commercial;
 using AgroControl.Application.Exporting;
 using AgroControl.Application.Identity;
 using AgroControl.Application.Intelligence;
@@ -48,6 +49,7 @@ builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<IrrigationService>();
 builder.Services.AddScoped<SustainabilityService>();
 builder.Services.AddScoped<ExportService>();
+builder.Services.AddScoped<CommercialService>();
 builder.Services.AddScoped<FinanceService>();
 builder.Services.AddScoped<MachineryService>();
 builder.Services.AddScoped<MarketService>();
@@ -102,7 +104,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.13.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.14.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -163,6 +165,7 @@ app.MapPrecisionAgricultureEndpoints();
 app.MapIrrigationEndpoints();
 app.MapSustainabilityEndpoints();
 app.MapExportEndpoints();
+app.MapCommercialEndpoints();
 app.Run();
 
 static bool TryGetOrganizationId(ClaimsPrincipal principal, out Guid organizationId) => Guid.TryParse(principal.FindFirstValue("org_id"), out organizationId);

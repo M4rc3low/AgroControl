@@ -14,7 +14,14 @@ public sealed class PlanEntitlementCatalogTests
         Assert.True(_catalog.Includes(PlanCode.Basic, ModuleKey.Farms));
         Assert.True(_catalog.Includes(PlanCode.Basic, ModuleKey.Finance));
         Assert.False(_catalog.Includes(PlanCode.Basic, ModuleKey.Intelligence));
+        Assert.False(_catalog.Includes(PlanCode.Basic, ModuleKey.Commercial));
         Assert.False(_catalog.Includes(PlanCode.Basic, ModuleKey.Export));
+    }
+
+    [Fact]
+    public void Pro_includes_commercial_module()
+    {
+        Assert.True(_catalog.Includes(PlanCode.Pro, ModuleKey.Commercial));
     }
 
     [Fact]

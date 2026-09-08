@@ -177,6 +177,24 @@
 - [x] testes unitários e integração PostgreSQL;
 - [x] documentação da Sprint 13.
 
+## Sprint 14 — Comercial e CRM ✅
+
+- [x] módulo `Commercial` com entitlement próprio;
+- [x] clientes por organização e status de relacionamento;
+- [x] contatos vinculados, principal e desativação lógica;
+- [x] oportunidades com valor, moeda, probabilidade, responsável e próximo passo;
+- [x] pipeline com transições explícitas e `Won`/`Lost` terminais;
+- [x] timeline append-only das mudanças de etapa;
+- [x] vínculos opcionais com Farm, Crop, Season e ExportOrder;
+- [x] validação de todos os vínculos no mesmo `OrganizationId`;
+- [x] resumo de pipeline, ganhos, perdas e conversão;
+- [x] valores resumidos por moeda, sem agregação incorreta entre moedas;
+- [x] API protegida pelo entitlement `Commercial`;
+- [x] interface web responsiva para clientes, contatos e oportunidades;
+- [x] migration `CommercialCore`, índices e model snapshot;
+- [x] testes unitários e integração PostgreSQL;
+- [x] documentação da Sprint 14.
+
 ## Próximos aprimoramentos
 
-O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para CRM/comercial, importação de geometrias, imagens de satélite/drone, índices vegetativos, zonas de manejo e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.
+O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para importação de geometrias, imagens de satélite/drone, índices vegetativos, zonas de manejo e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.

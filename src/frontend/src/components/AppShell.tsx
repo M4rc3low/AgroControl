@@ -12,6 +12,7 @@ const navigation = [
   { to: '/irrigation', label: 'Irrigação', icon: 'droplet' as const, module: 'Irrigation' },
   { to: '/sustainability', label: 'Sustentabilidade', icon: 'leaf' as const, module: 'Sustainability' },
   { to: '/export', label: 'Exportação', icon: 'box' as const, module: 'Export' },
+  { to: '/commercial', label: 'Comercial', icon: 'chart' as const, module: 'Commercial' },
   { to: '/inventory', label: 'Estoque', icon: 'box' as const, module: 'Inventory' },
   { to: '/finance', label: 'Financeiro', icon: 'wallet' as const, module: 'Finance' },
   { to: '/machinery', label: 'Máquinas', icon: 'tractor' as const, module: 'Machinery' },

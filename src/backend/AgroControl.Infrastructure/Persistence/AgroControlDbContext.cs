@@ -1,4 +1,5 @@
 using AgroControl.Domain.Modules.Crops;
+using AgroControl.Domain.Modules.Commercial;
 using AgroControl.Domain.Modules.Exporting;
 using AgroControl.Domain.Modules.Farms;
 using AgroControl.Domain.Modules.Fields;
@@ -39,6 +40,10 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
     public DbSet<ExportDocument> ExportDocuments => Set<ExportDocument>();
     public DbSet<ExportCost> ExportCosts => Set<ExportCost>();
     public DbSet<ExportOrderStatusEvent> ExportOrderStatusEvents => Set<ExportOrderStatusEvent>();
+    public DbSet<CommercialCustomer> CommercialCustomers => Set<CommercialCustomer>();
+    public DbSet<CommercialContact> CommercialContacts => Set<CommercialContact>();
+    public DbSet<CommercialOpportunity> CommercialOpportunities => Set<CommercialOpportunity>();
+    public DbSet<OpportunityStageEvent> OpportunityStageEvents => Set<OpportunityStageEvent>();
     public DbSet<FinancialCategory> FinancialCategories => Set<FinancialCategory>();
     public DbSet<CostCenter> CostCenters => Set<CostCenter>();
     public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
@@ -390,6 +395,70 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
             entity.HasOne<ExportOrder>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.OrderId);
             entity.HasIndex(x => new { x.OrganizationId, x.OrderId, x.OccurredOn });
+        });
+        modelBuilder.Entity<CommercialCustomer>(entity =>
+        {
+            entity.ToTable("commercial_customers"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.TradeName).HasMaxLength(200);
+            entity.Property(x => x.TaxId).HasMaxLength(80);
+            entity.Property(x => x.Email).HasMaxLength(254);
+            entity.Property(x => x.Phone).HasMaxLength(60);
+            entity.Property(x => x.CountryCode).HasMaxLength(2);
+            entity.Property(x => x.City).HasMaxLength(120);
+            entity.Property(x => x.State).HasMaxLength(40);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1200);
+            entity.Ignore(x => x.IsInactive);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Status, x.Name });
+        });
+        modelBuilder.Entity<CommercialContact>(entity =>
+        {
+            entity.ToTable("commercial_contacts"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.Role).HasMaxLength(120);
+            entity.Property(x => x.Email).HasMaxLength(254);
+            entity.Property(x => x.Phone).HasMaxLength(60);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CommercialCustomer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.CustomerId);
+            entity.HasIndex(x => new { x.OrganizationId, x.CustomerId, x.IsActive });
+        });
+        modelBuilder.Entity<CommercialOpportunity>(entity =>
+        {
+            entity.ToTable("commercial_opportunities"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.ExpectedValue).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.ProbabilityPercent).HasPrecision(5, 2).IsRequired();
+            entity.Property(x => x.Stage).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.OwnerName).HasMaxLength(160);
+            entity.Property(x => x.NextStep).HasMaxLength(500);
+            entity.Property(x => x.Notes).HasMaxLength(1200);
+            entity.Ignore(x => x.WeightedValue); entity.Ignore(x => x.IsTerminal);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CommercialCustomer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Crop>().WithMany().HasForeignKey(x => x.CropId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Season>().WithMany().HasForeignKey(x => x.SeasonId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ExportOrder>().WithMany().HasForeignKey(x => x.ExportOrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.CustomerId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Stage, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.OrganizationId, x.Currency, x.CreatedAtUtc });
+            entity.HasIndex(x => x.FarmId); entity.HasIndex(x => x.CropId); entity.HasIndex(x => x.SeasonId); entity.HasIndex(x => x.ExportOrderId);
+        });
+        modelBuilder.Entity<OpportunityStageEvent>(entity =>
+        {
+            entity.ToTable("commercial_opportunity_stage_events"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.FromStage).HasConversion<string>().HasMaxLength(32);
+            entity.Property(x => x.ToStage).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CommercialOpportunity>().WithMany().HasForeignKey(x => x.OpportunityId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.OpportunityId);
+            entity.HasIndex(x => new { x.OrganizationId, x.OpportunityId, x.OccurredOn });
         });
     }
 }
