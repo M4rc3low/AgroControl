@@ -61,6 +61,8 @@ Isso significa que **offline nesta sprint é apenas o shell da interface**. Dado
 
 Sincronização offline de dados será uma evolução separada com armazenamento local, fila, versionamento e resolução de conflitos próprios.
 
+O service worker não é registrado quando a mesma SPA está rodando dentro da origem Tauri. O desktop não precisa de uma segunda camada de cache do app shell.
+
 ## Desktop Tauri
 
 A aplicação desktop usa Tauri v2 com o mesmo build Vite.
@@ -90,6 +92,12 @@ A janela desktop:
 - usa CSP explícita;
 - continua autenticando na API via JWT;
 - continua sujeita a `OrganizationId`, entitlements e `FarmAccessScope`.
+
+### Sessão
+
+Browser, PWA e Desktop continuam usando o contrato Bearer existente e `sessionStorage` para a sessão JWT. A Sprint 20 não copia token para arquivo, Registry, banco local ou plugin nativo.
+
+A escolha é deliberada: o shell desktop não cria uma nova camada de persistência privilegiada para credenciais. Uma futura evolução para cookie HttpOnly/BFF ou armazenamento nativo seguro deve ser tratada como mudança de modelo de autenticação e não como detalhe do instalador.
 
 ## URL da API e CORS
 
