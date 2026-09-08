@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
 import { Icon } from '../components/Icon';
 import { Badge, Button, Card, EmptyState, Modal, PageHeader, Spinner } from '../components/Ui';
 import { apiRequest, getAllPaged } from '../lib/api';
@@ -11,7 +12,7 @@ interface IrrigationZone {
   fieldId: string;
   name: string;
   areaHectares: number;
-  method: string;
+  method: number;
   minimumMoisturePercent: number;
   targetMoisturePercent: number;
   maximumMoisturePercent: number;
@@ -26,8 +27,8 @@ interface ZoneStatus {
   hasReading: boolean;
   soilMoisturePercent: number | null;
   capturedAtUtc: string | null;
-  condition: string | null;
-  recommendation: string;
+  condition: number | null;
+  recommendation: number;
   message: string;
 }
 
@@ -37,7 +38,7 @@ interface IrrigationApplication {
   fieldId: string;
   depthMillimeters: number;
   estimatedVolumeCubicMeters: number;
-  source: string;
+  source: number;
   startedAtUtc: string;
   notes: string | null;
 }
@@ -48,7 +49,36 @@ interface IrrigationSummary {
   estimatedVolumeCubicMeters: number;
 }
 
-const methods = ['CenterPivot', 'Drip', 'Sprinkler', 'MicroSprinkler', 'Furrow', 'Other'];
+const methods = [
+  { value: 1, label: 'Pivô central' },
+  { value: 2, label: 'Gotejamento' },
+  { value: 3, label: 'Aspersão' },
+  { value: 4, label: 'Microaspersão' },
+  { value: 5, label: 'Sulcos' },
+  { value: 6, label: 'Outro' }
+];
+
+const conditionLabels: Record<number, string> = {
+  1: 'Crítica',
+  2: 'Seca',
+  3: 'Alvo',
+  4: 'Úmida'
+};
+
+const sourceLabels: Record<number, string> = {
+  1: 'Manual',
+  2: 'Medidor',
+  3: 'Importada',
+  4: 'Correção'
+};
+
+function conditionTone(condition: number | null | undefined): 'neutral' | 'success' | 'warning' | 'danger' | 'info' {
+  if (condition === 1) return 'danger';
+  if (condition === 2) return 'warning';
+  if (condition === 3) return 'success';
+  if (condition === 4) return 'info';
+  return 'neutral';
+}
 
 export function IrrigationPage() {
   const { platform } = useAuth();
@@ -80,13 +110,28 @@ export function IrrigationPage() {
       setApplications(applicationPage.items);
       setSummary(summaryData);
       const pairs = await Promise.all(zoneItems.filter(zone => zone.isActive).map(async zone => {
-        try { return [zone.id, await apiRequest<ZoneStatus>(`/api/v1/irrigation/zones/${zone.id}/status`)] as const; }
-        catch { return [zone.id, { zoneId: zone.id, telemetryDeviceId: zone.telemetryDeviceId, telemetryAvailable: false, hasReading: false, soilMoisturePercent: null, capturedAtUtc: null, condition: null, recommendation: 'Monitor', message: 'Telemetria indisponível no momento.' }] as const; }
+        try {
+          return [zone.id, await apiRequest<ZoneStatus>(`/api/v1/irrigation/zones/${zone.id}/status`)] as const;
+        } catch {
+          return [zone.id, {
+            zoneId: zone.id,
+            telemetryDeviceId: zone.telemetryDeviceId,
+            telemetryAvailable: false,
+            hasReading: false,
+            soilMoisturePercent: null,
+            capturedAtUtc: null,
+            condition: null,
+            recommendation: 2,
+            message: 'Telemetria indisponível no momento.'
+          }] as const;
+        }
       }));
       setStatuses(Object.fromEntries(pairs));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível carregar o manejo de irrigação.');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { void load(); }, [allowed]);
@@ -112,10 +157,9 @@ export function IrrigationPage() {
       <div className="section-heading"><div><span className="eyebrow">Condição atual</span><h2>Zonas de irrigação</h2></div></div>
       {zones.length === 0 ? <EmptyState title="Nenhuma zona cadastrada" description="Crie a primeira zona para organizar limites de umidade e aplicações de água." /> : <div className="irrigation-zone-grid">{zones.map(zone => {
         const status = statuses[zone.id];
-        const tone = status?.condition === 'Critical' ? 'danger' : status?.condition === 'Dry' ? 'warning' : status?.condition === 'Wet' ? 'info' : status?.condition === 'Target' ? 'success' : 'neutral';
         return <Card key={zone.id} className={!zone.isActive ? 'irrigation-zone irrigation-zone--inactive' : 'irrigation-zone'}>
           <div className="irrigation-zone__head"><div><strong>{zone.name}</strong><small>{fieldNames[zone.fieldId] ?? 'Talhão'} · {zone.areaHectares.toLocaleString('pt-BR')} ha</small></div><Badge tone={zone.isActive ? 'success' : 'neutral'}>{zone.isActive ? 'Ativa' : 'Inativa'}</Badge></div>
-          <div className="irrigation-moisture"><span>Umidade do solo</span><strong>{status?.soilMoisturePercent != null ? `${status.soilMoisturePercent.toLocaleString('pt-BR')}%` : '—'}</strong><Badge tone={tone}>{status?.condition ?? 'Sem leitura'}</Badge></div>
+          <div className="irrigation-moisture"><span>Umidade do solo</span><strong>{status?.soilMoisturePercent != null ? `${status.soilMoisturePercent.toLocaleString('pt-BR')}%` : '—'}</strong><Badge tone={conditionTone(status?.condition)}>{status?.condition != null ? conditionLabels[status.condition] ?? 'Sem leitura' : 'Sem leitura'}</Badge></div>
           <p>{status?.message ?? 'Consultando telemetria...'}</p>
           <div className="irrigation-thresholds"><span>mín. {zone.minimumMoisturePercent}%</span><span>alvo {zone.targetMoisturePercent}%</span><span>máx. {zone.maximumMoisturePercent}%</span></div>
           {zone.isActive && <Button variant="secondary" onClick={() => { setSelectedZoneId(zone.id); setApplicationModal(true); }}>Registrar aplicação</Button>}
@@ -125,7 +169,7 @@ export function IrrigationPage() {
 
     <section className="irrigation-section">
       <div className="section-heading"><div><span className="eyebrow">Histórico</span><h2>Aplicações de água</h2></div><Button variant="secondary" onClick={() => setApplicationModal(true)}><Icon name="plus" size={16} /> Registrar</Button></div>
-      {applications.length === 0 ? <EmptyState title="Nenhuma aplicação registrada" description="As aplicações reais aparecerão aqui sem reescrever o histórico." /> : <div className="table-wrap"><table><thead><tr><th>Data</th><th>Zona</th><th>Lâmina</th><th>Volume estimado</th><th>Origem</th></tr></thead><tbody>{applications.map(item => <tr key={item.id}><td>{new Date(item.startedAtUtc).toLocaleString('pt-BR')}</td><td>{zoneNames[item.zoneId] ?? item.zoneId.slice(0, 8)}</td><td>{item.depthMillimeters.toLocaleString('pt-BR')} mm</td><td>{item.estimatedVolumeCubicMeters.toLocaleString('pt-BR')} m³</td><td>{item.source}</td></tr>)}</tbody></table></div>}
+      {applications.length === 0 ? <EmptyState title="Nenhuma aplicação registrada" description="As aplicações reais aparecerão aqui sem reescrever o histórico." /> : <div className="table-wrap"><table><thead><tr><th>Data</th><th>Zona</th><th>Lâmina</th><th>Volume estimado</th><th>Origem</th></tr></thead><tbody>{applications.map(item => <tr key={item.id}><td>{new Date(item.startedAtUtc).toLocaleString('pt-BR')}</td><td>{zoneNames[item.zoneId] ?? item.zoneId.slice(0, 8)}</td><td>{item.depthMillimeters.toLocaleString('pt-BR')} mm</td><td>{item.estimatedVolumeCubicMeters.toLocaleString('pt-BR')} m³</td><td>{sourceLabels[item.source] ?? `Origem ${item.source}`}</td></tr>)}</tbody></table></div>}
     </section>
 
     <ZoneModal open={zoneModal} fields={fields} onClose={() => setZoneModal(false)} onSaved={load} />
@@ -137,27 +181,64 @@ function ZoneModal({ open, fields, onClose, onSaved }: { open: boolean; fields: 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setSaving(true); setError(null);
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
     const form = new FormData(event.currentTarget);
     try {
-      await apiRequest('/api/v1/irrigation/zones', { method: 'POST', body: JSON.stringify({ fieldId: form.get('fieldId'), name: form.get('name'), areaHectares: Number(form.get('areaHectares')), method: form.get('method'), minimumMoisturePercent: Number(form.get('minimum')), targetMoisturePercent: Number(form.get('target')), maximumMoisturePercent: Number(form.get('maximum')), telemetryDeviceId: String(form.get('telemetryDeviceId') ?? '').trim() || null }) });
-      onClose(); await onSaved();
-    } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível criar a zona.'); } finally { setSaving(false); }
+      await apiRequest('/api/v1/irrigation/zones', {
+        method: 'POST',
+        body: JSON.stringify({
+          fieldId: form.get('fieldId'),
+          name: form.get('name'),
+          areaHectares: Number(form.get('areaHectares')),
+          method: Number(form.get('method')),
+          minimumMoisturePercent: Number(form.get('minimum')),
+          targetMoisturePercent: Number(form.get('target')),
+          maximumMoisturePercent: Number(form.get('maximum')),
+          telemetryDeviceId: String(form.get('telemetryDeviceId') ?? '').trim() || null
+        })
+      });
+      onClose();
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível criar a zona.');
+    } finally {
+      setSaving(false);
+    }
   }
-  return <Modal open={open} title="Nova zona de irrigação" description="Configure área, método e faixas de umidade." onClose={onClose}><form className="form-grid" onSubmit={submit}>{error && <div className="inline-warning form-grid__full">{error}</div>}<label>Talhão<select name="fieldId" required>{fields.map(field => <option key={field.id} value={field.id}>{field.name} · {field.areaHectares} ha</option>)}</select></label><label>Nome<input name="name" required placeholder="Zona Norte" /></label><label>Área (ha)<input name="areaHectares" required type="number" min="0.0001" step="0.0001" /></label><label>Método<select name="method">{methods.map(method => <option key={method}>{method}</option>)}</select></label><label>Umidade mínima (%)<input name="minimum" type="number" min="0" max="100" step="0.1" defaultValue="35" /></label><label>Umidade alvo (%)<input name="target" type="number" min="0" max="100" step="0.1" defaultValue="50" /></label><label>Umidade máxima (%)<input name="maximum" type="number" min="0" max="100" step="0.1" defaultValue="75" /></label><label>Device ID de telemetria<input name="telemetryDeviceId" placeholder="opcional" /></label><div className="form-actions form-grid__full"><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={saving}>{saving ? 'Salvando...' : 'Criar zona'}</Button></div></form></Modal>;
+  return <Modal open={open} title="Nova zona de irrigação" description="Configure área, método e faixas de umidade." onClose={onClose}><form className="form-grid" onSubmit={submit}>{error && <div className="inline-warning form-grid__full">{error}</div>}<label>Talhão<select name="fieldId" required>{fields.map(field => <option key={field.id} value={field.id}>{field.name} · {field.areaHectares} ha</option>)}</select></label><label>Nome<input name="name" required placeholder="Zona Norte" /></label><label>Área (ha)<input name="areaHectares" required type="number" min="0.0001" step="0.0001" /></label><label>Método<select name="method">{methods.map(method => <option key={method.value} value={method.value}>{method.label}</option>)}</select></label><label>Umidade mínima (%)<input name="minimum" type="number" min="0" max="100" step="0.1" defaultValue="35" /></label><label>Umidade alvo (%)<input name="target" type="number" min="0" max="100" step="0.1" defaultValue="50" /></label><label>Umidade máxima (%)<input name="maximum" type="number" min="0" max="100" step="0.1" defaultValue="75" /></label><label>Device ID de telemetria<input name="telemetryDeviceId" placeholder="opcional" /></label><div className="form-actions form-grid__full"><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={saving}>{saving ? 'Salvando...' : 'Criar zona'}</Button></div></form></Modal>;
 }
 
 function ApplicationModal({ open, zones, selectedZoneId, onClose, onSaved }: { open: boolean; zones: IrrigationZone[]; selectedZoneId: string; onClose(): void; onSaved(): Promise<void> }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setSaving(true); setError(null);
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
     const form = new FormData(event.currentTarget);
     try {
-      await apiRequest('/api/v1/irrigation/applications', { method: 'POST', body: JSON.stringify({ zoneId: form.get('zoneId'), depthMillimeters: Number(form.get('depth')), source: 'Manual', startedAtUtc: new Date(String(form.get('startedAt'))).toISOString(), endedAtUtc: null, notes: String(form.get('notes') ?? '').trim() || null }) });
-      onClose(); await onSaved();
-    } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível registrar a aplicação.'); } finally { setSaving(false); }
+      await apiRequest('/api/v1/irrigation/applications', {
+        method: 'POST',
+        body: JSON.stringify({
+          zoneId: form.get('zoneId'),
+          depthMillimeters: Number(form.get('depth')),
+          source: 1,
+          startedAtUtc: new Date(String(form.get('startedAt'))).toISOString(),
+          endedAtUtc: null,
+          notes: String(form.get('notes') ?? '').trim() || null
+        })
+      });
+      onClose();
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível registrar a aplicação.');
+    } finally {
+      setSaving(false);
+    }
   }
-  const defaultDate = new Date(); defaultDate.setMinutes(defaultDate.getMinutes() - defaultDate.getTimezoneOffset());
+  const defaultDate = new Date();
+  defaultDate.setMinutes(defaultDate.getMinutes() - defaultDate.getTimezoneOffset());
   return <Modal open={open} title="Registrar aplicação de água" description="O registro é append-only; correções posteriores devem ser novos lançamentos." onClose={onClose}><form className="form-grid" onSubmit={submit}>{error && <div className="inline-warning form-grid__full">{error}</div>}<label>Zona<select name="zoneId" required defaultValue={selectedZoneId}>{!selectedZoneId && <option value="">Selecione</option>}{zones.map(zone => <option key={zone.id} value={zone.id}>{zone.name}</option>)}</select></label><label>Lâmina aplicada (mm)<input name="depth" type="number" min="0.001" step="0.001" required /></label><label>Início<input name="startedAt" type="datetime-local" defaultValue={defaultDate.toISOString().slice(0, 16)} required /></label><label className="form-grid__full">Observação<textarea name="notes" rows={3} /></label><div className="form-actions form-grid__full"><Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={saving}>{saving ? 'Registrando...' : 'Registrar aplicação'}</Button></div></form></Modal>;
 }
