@@ -1,8 +1,10 @@
 # Sprint 19 — STAC e descoberta de cenas
 
-## Objetivo
+## Status
 
-Adicionar descoberta de cenas geoespaciais via STAC ao workspace de Sensoriamento Remoto, preservando as fronteiras de segurança por `OrganizationId` e `FarmAccessScope` implementadas até a Sprint 18.
+**Concluída — API 0.19.0**
+
+A Sprint 19 adiciona descoberta e importação controlada de cenas geoespaciais via STAC ao workspace de Sensoriamento Remoto, preservando as fronteiras de segurança por `OrganizationId` e `FarmAccessScope` consolidadas na Sprint 18.
 
 A descoberta é externa e transitória. O AgroControl só persiste uma cena quando o usuário escolhe explicitamente importar um item para o fluxo existente de `RemoteSensingScene` e processamento raster.
 
@@ -19,9 +21,9 @@ A descoberta é externa e transitória. O AgroControl só persiste uma cena quan
 
 ## Contrato STAC adotado
 
-A integração lê STAC Item 1.1.0 e utiliza o contrato de Item Search da STAC API 1.0.0 como baseline interoperável.
+A integração normaliza STAC Item/ItemCollection e usa o contrato de Item Search como baseline interoperável.
 
-O cliente interno normaliza apenas os campos necessários ao AgroControl:
+O cliente interno expõe somente os campos necessários ao AgroControl:
 
 - provider;
 - collection;
@@ -56,83 +58,163 @@ STAC provider configurado
 Import explícito
       |
       v
+reconsulta Provider + Collection + ExternalId
+      |
+      v
+validação do AssetKey
+      |
+      v
 RemoteSensingScene
       |
       v
 Raster Processing (ação separada)
 ```
 
+## Endpoints
+
+```text
+GET  /api/v1/precision/remote-sensing/discovery/providers
+POST /api/v1/precision/remote-sensing/discovery/search
+POST /api/v1/precision/remote-sensing/discovery/import
+```
+
+## Provider inicial
+
+O repositório possui configuração inicial para **Earth Search v1**, com coleções públicas suportadas pelo provider configurado. A arquitetura não acopla o domínio ao Earth Search: novos providers entram por configuração e pelo contrato `IRemoteSceneDiscoveryClient`.
+
 ## Segurança de rede
 
 - base URLs de STAC vêm apenas da configuração do backend;
-- apenas HTTPS é permitido fora de desenvolvimento local explicitamente controlado;
+- HTTPS é exigido fora de loopback/local controlado;
 - `href` de asset não é executado durante descoberta;
 - assets processáveis passam por validação de scheme, media type e roles;
-- query strings contendo credenciais não devem aparecer em logs;
-- redirects não podem transformar um provider configurado em proxy HTTP aberto;
-- respostas possuem limite de tamanho e timeout.
+- query strings são removidas das referências normalizadas de assets;
+- credenciais embutidas em URLs não são aceitas;
+- paginação só aceita continuação no mesmo origin e mesmo path do endpoint de busca;
+- respostas possuem limite de tamanho;
+- `HttpClient` dedicado possui timeout e cancellation token;
+- falha do provider não interfere no CRUD/listagem de cenas persistidas.
 
 ## Escopo multi-fazenda
 
 A busca começa a partir de um `FieldId` interno, nunca de uma geometria arbitrária fornecida pelo browser.
 
-Fluxo esperado:
+Fluxo:
 
-1. API recebe `FieldId` e filtros;
+1. API recebe `FieldId`, `SeasonId` opcional e filtros;
 2. backend carrega o talhão respeitando `OrganizationId` + `FarmAccessScope`;
-3. backend obtém a geometria canônica do talhão;
+3. backend obtém o boundary canônico do talhão;
 4. cliente STAC recebe somente geometria, período e filtros externos necessários;
 5. resultado é normalizado;
-6. importação volta a validar Field/Season antes de criar `RemoteSensingScene`.
+6. importação revalida Field/Season;
+7. backend reconsulta o item no provider por `Provider + Collection + ExternalId`;
+8. somente o `AssetKey` escolhido e validado como raster elegível pode virar `AssetReference`.
 
-Um usuário limitado à Fazenda A não pode usar descoberta/importação para inferir ou vincular dados da Fazenda B.
+Um usuário limitado à Fazenda A não consegue usar descoberta/importação para consultar ou vincular dados da Fazenda B. A suíte de integração valida esse cenário dentro da mesma organização e exige que o provider nem seja chamado quando o talhão está fora do escopo.
 
-## Fase 1 — Fundação
+## Web
 
-- contratos internos de descoberta;
-- interface `IRemoteSceneDiscoveryClient`;
-- configuração de providers;
-- cliente STAC HTTP;
-- parsing seguro de FeatureCollection/Item;
-- seleção inicial de assets GeoTIFF/COG;
-- testes unitários do parser/validação.
+A Web possui a rota:
 
-## Fase 2 — Serviço e API
+```text
+/precision/remote-sensing/discovery
+```
 
-- `RemoteSceneDiscoveryService`;
-- consulta de Field/Season com escopo efetivo;
-- endpoints `/providers`, `/search` e `/import`;
-- idempotência de importação;
-- ProblemDetails para timeout/indisponibilidade/payload inválido.
+Funcionalidades entregues:
 
-## Fase 3 — Web
-
-- ação `Descobrir cenas`;
-- filtros por período/provider/collection/nuvens;
+- ação `Descobrir cenas` no workspace;
+- provider e collection vindos do backend;
+- filtros por período e cobertura máxima de nuvens;
 - resultados paginados;
-- footprint no mapa;
-- detalhes de assets;
-- importação explícita;
-- estados de loading/vazio/erro/timeout.
+- metadados de aquisição, resolução, plataforma e quantidade de assets raster;
+- preview de footprint em MapLibre comparado ao limite do talhão;
+- importação explícita por asset;
+- feedback de loading, vazio e erro;
+- layout responsivo;
+- preservação do contexto de talhão/safra e do escopo operacional global.
 
-## Fase 4 — Qualidade
+## Observabilidade
 
-- testes A × B na mesma organização;
-- fake STAC server em integração;
-- testes de timeout, 503 e payload inválido;
-- frontend tests;
-- observabilidade sem alta cardinalidade;
-- README, ARCHITECTURE e ROADMAP;
-- API `0.19.0`;
-- Backend CI, Frontend CI, Platform CI e CodeQL verdes no mesmo head;
-- squash merge e encerramento da Issue #53.
+Meter dedicado:
+
+```text
+AgroControl.RemoteSceneDiscovery
+```
+
+Métricas:
+
+- `agrocontrol.stac.searches`;
+- `agrocontrol.stac.search.duration`;
+- `agrocontrol.stac.search.results`;
+- `agrocontrol.stac.imports`.
+
+Labels são limitadas a provider configurado e outcome. `itemId`, URL de asset, `farmId`, `userId` e tokens não são usados como labels.
+
+## Testes entregues
+
+### Serviço de aplicação
+
+- [x] busca usa o boundary canônico do Field;
+- [x] Field fora do escopo impede chamada ao provider;
+- [x] asset não-raster é rejeitado;
+- [x] importação reconsulta o item no provider;
+- [x] somente o asset selecionado é persistido;
+- [x] idempotência continua delegada ao `RemoteSensingScene` por `Provider + ExternalId`.
+
+### Cliente STAC
+
+- [x] parsing e normalização de item;
+- [x] cloud cover/GSD/platform/constellation;
+- [x] seleção de GeoTIFF/COG candidatos;
+- [x] remoção de query string de asset;
+- [x] rejeição de paginação cross-origin;
+- [x] continuação same-origin/same-path;
+- [x] provider desconhecido/desabilitado é rejeitado antes da rede;
+- [x] 404 de item é mapeado para NotFound;
+- [x] timeout, indisponibilidade e payload inválido possuem resultados explícitos no contrato.
+
+### Integração e escopo
+
+- [x] PostgreSQL/PostGIS real;
+- [x] Fazenda A × Fazenda B dentro da mesma organização;
+- [x] Field da Fazenda B não pode ser usado para busca/importação pelo usuário restrito à A;
+- [x] provider não é chamado quando o contexto está fora do escopo.
+
+### Frontend
+
+- [x] helpers de seleção de asset raster;
+- [x] chave estável de importação;
+- [x] parsing seguro do footprint para preview;
+- [x] TypeScript, Vitest e build de produção no Frontend CI.
+
+## Entregas
+
+- [x] contratos internos de descoberta;
+- [x] `IRemoteSceneDiscoveryClient`;
+- [x] cliente STAC HTTP;
+- [x] provider configurado no backend;
+- [x] `RemoteSceneDiscoveryService`;
+- [x] endpoints `/providers`, `/search` e `/import`;
+- [x] importação controlada para `RemoteSensingScene`;
+- [x] segurança A × B;
+- [x] Web de descoberta e footprint;
+- [x] métricas OpenTelemetry;
+- [x] documentação;
+- [x] API `0.19.0`.
 
 ## Fora do escopo
 
+Ficam para sprints posteriores:
+
 - download/cache assíncrono de grandes assets;
-- autenticação específica de marketplaces;
+- autenticação específica de marketplaces/provedores;
 - geração automática de índices a partir de bandas brutas;
 - cloud masks avançadas;
 - mosaico de cenas;
 - compra de imagens comerciais;
-- decisão automática de melhor cena sem confirmação do usuário.
+- decisão automática de melhor cena sem confirmação do usuário;
+- sincronização offline/desktop.
+
+## Gate de encerramento
+
+A Sprint só deve ser considerada mesclada quando **Backend CI + Frontend CI + Platform CI + CodeQL** estiverem verdes no mesmo head do PR #56. O merge deve ser por squash e a Issue #53 deve ser encerrada somente depois do merge.
