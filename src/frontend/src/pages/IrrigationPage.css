@@ -16,6 +16,7 @@
 .irrigation-moisture strong { font-size: 1.45rem; }
 .irrigation-thresholds { display: flex; gap: .5rem; flex-wrap: wrap; color: var(--muted); font-size: .82rem; }
 .irrigation-thresholds span { padding: .28rem .5rem; border: 1px solid var(--border); border-radius: 999px; }
+.irrigation-zone__actions { display: flex; gap: .55rem; flex-wrap: wrap; align-items: center; }
 .form-grid textarea { width: 100%; resize: vertical; }
 @media (max-width: 980px) { .irrigation-zone-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 720px) { .irrigation-metrics, .irrigation-zone-grid { grid-template-columns: 1fr; } .section-heading { align-items: start; flex-direction: column; } }
+@media (max-width: 720px) { .irrigation-metrics, .irrigation-zone-grid { grid-template-columns: 1fr; } .section-heading { align-items: start; flex-direction: column; } .irrigation-zone__actions .button { flex: 1 1 auto; } }
