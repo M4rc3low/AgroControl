@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IMachineryRepository, MachineryRepository>();
         services.AddScoped<IMarketRepository, MarketRepository>();
         services.AddScoped<IPrecisionAgricultureRepository, PrecisionAgricultureRepository>();
+        services.AddScoped<IRemoteSensingRepository, RemoteSensingRepository>();
         services.AddScoped<IIntelligenceDataSource, IntelligenceDataSource>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
