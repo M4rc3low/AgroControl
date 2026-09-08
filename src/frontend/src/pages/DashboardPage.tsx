@@ -92,15 +92,11 @@ export function DashboardPage() {
     const farmFields = visibleFields.filter(field => field.farmId === farm.id);
     const fieldIds = new Set(farmFields.map(field => field.id));
     const farmSeasons = visibleSeasons.filter(season => fieldIds.has(season.fieldId));
-    const harvested = farmSeasons.filter(season => season.actualYieldPerHectare != null);
-    const averageYield = harvested.length
-      ? harvested.reduce((sum, season) => sum + (season.actualYieldPerHectare ?? 0), 0) / harvested.length
-      : null;
     return {
       farm,
       fieldCount: farmFields.length,
       activeSeasonCount: farmSeasons.filter(season => season.status === 'Active').length,
-      averageYield
+      harvestedSeasonCount: farmSeasons.filter(season => season.status === 'Harvested').length
     };
   }).sort((a, b) => b.farm.totalAreaHectares - a.farm.totalAreaHectares), [scopedFarms, visibleFields, visibleSeasons]);
 
@@ -154,7 +150,7 @@ export function DashboardPage() {
 
         <Card className="dashboard-card dashboard-card--wide">
           <div className="card-heading"><div><span className="eyebrow">Comparativo</span><h2>Desempenho por propriedade</h2></div><Link className="text-link" to="/production">Gerenciar <Icon name="arrow" size={15} /></Link></div>
-          {comparisons.length ? <div className="multi-farm-list">{comparisons.slice(0, 20).map(item => <div className="multi-farm-row" key={item.farm.id}><div><strong>{item.farm.name}</strong><span>{[item.farm.city, item.farm.stateCode ?? item.farm.state].filter(Boolean).join(' / ') || 'Localização não informada'} · {item.farm.timeZoneId}</span></div><div className="multi-farm-row__metric"><span>Área</span><strong>{formatNumber(item.farm.totalAreaHectares)} ha</strong></div><div className="multi-farm-row__metric"><span>Talhões / safras ativas</span><strong>{item.fieldCount} / {item.activeSeasonCount}</strong></div><div className="multi-farm-row__metric"><span>Produtividade média realizada</span><strong>{item.averageYield == null ? '—' : `${formatNumber(item.averageYield)} / ha`}</strong></div><Button variant="secondary" onClick={() => setSelected({ kind: 'farm', farmId: item.farm.id })}>Abrir</Button></div>)}</div> : <EmptyState title="Nenhuma propriedade neste contexto" description="Ajuste o seletor operacional ou solicite acesso a uma propriedade." />}
+          {comparisons.length ? <div className="multi-farm-list">{comparisons.slice(0, 20).map(item => <div className="multi-farm-row" key={item.farm.id}><div><strong>{item.farm.name}</strong><span>{[item.farm.city, item.farm.stateCode ?? item.farm.state].filter(Boolean).join(' / ') || 'Localização não informada'} · {item.farm.timeZoneId}</span></div><div className="multi-farm-row__metric"><span>Área</span><strong>{formatNumber(item.farm.totalAreaHectares)} ha</strong></div><div className="multi-farm-row__metric"><span>Talhões / safras ativas</span><strong>{item.fieldCount} / {item.activeSeasonCount}</strong></div><div className="multi-farm-row__metric"><span>Safras concluídas</span><strong>{item.harvestedSeasonCount}</strong></div><Button variant="secondary" onClick={() => setSelected({ kind: 'farm', farmId: item.farm.id })}>Abrir</Button></div>)}</div> : <EmptyState title="Nenhuma propriedade neste contexto" description="Ajuste o seletor operacional ou solicite acesso a uma propriedade." />}
         </Card>
 
         <Card className="dashboard-card">
