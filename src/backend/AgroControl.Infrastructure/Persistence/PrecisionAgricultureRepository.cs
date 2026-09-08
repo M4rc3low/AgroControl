@@ -86,8 +86,8 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
             FROM management_zones AS z
             WHERE z."OrganizationId" = @organizationId
               AND (CAST(@fieldId AS uuid) IS NULL OR z."FieldId" = CAST(@fieldId AS uuid))
-              AND (@type IS NULL OR z."Type" = @type)
-              AND (@classification IS NULL OR LOWER(COALESCE(z."Classification", '')) LIKE '%' || LOWER(@classification) || '%')
+              AND (CAST(@type AS text) IS NULL OR z."Type" = CAST(@type AS text))
+              AND (CAST(@classification AS text) IS NULL OR LOWER(COALESCE(z."Classification", '')) LIKE '%' || LOWER(CAST(@classification AS text)) || '%')
               AND (@includeInactive OR z."IsActive")
             ORDER BY z."Name", z."Id";
             """;
