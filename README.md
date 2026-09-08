@@ -2,7 +2,7 @@
 
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 12 concluída — Sustentabilidade, emissões estimadas e indicadores de CO₂e**
+> Status atual: **Sprint 13 concluída — Exportação, câmbio, documentos e logística internacional**
 
 ## Objetivo
 
@@ -18,7 +18,8 @@ Centralizar os principais fluxos de uma operação rural em uma única plataform
 - sensores, GPS, estações e telemetria;
 - zonas de irrigação, umidade do solo e aplicações de água;
 - fatores de emissão, atividades e indicadores gerenciais de CO₂e;
-- evolução futura para exportação, sensoriamento remoto e análises agronômicas avançadas.
+- pedidos de exportação, câmbio, documentação e custos logísticos;
+- evolução futura para sensoriamento remoto, CRM e análises agronômicas avançadas.
 
 Os módulos são liberados por plano e o bloqueio é validado no backend, não apenas na interface.
 
@@ -79,6 +80,7 @@ A aplicação web mantém o navegador no mesmo origin para `/api`; a API concent
 - workspace de agricultura de precisão com mapa e limites de talhões;
 - painel de irrigação com zonas, condição hídrica, aplicações e volume estimado;
 - workspace de sustentabilidade com fatores de emissão, ledger de atividades, CO₂e e composição por categoria;
+- workspace de exportação com pedidos, câmbio, logística, custos, documentos e timeline operacional;
 - layout para desktop, tablet e mobile;
 - proxy reverso same-origin no Nginx.
 
@@ -142,6 +144,21 @@ O frontend melhora a experiência, mas **não substitui as validações de autor
 - isolamento multi-tenant e proteção pelo entitlement `Sustainability`.
 
 Os indicadores de sustentabilidade são **estimativas gerenciais e apoio à decisão**. O AgroControl não certifica inventários, não executa auditoria ambiental e não emite, certifica ou comercializa créditos de carbono.
+
+### Exportação
+
+- pedidos internacionais com número único por organização;
+- comprador, país de destino, produto, quantidade, unidade e vínculo opcional com propriedade/talhão/cultura/safra;
+- moedas ISO 4217, preço unitário e snapshot da taxa de câmbio para BRL;
+- Incoterms e fluxo `Draft`, `Negotiation`, `Contracted`, `InTransit`, `Delivered` e `Cancelled`;
+- timeline append-only das mudanças de status;
+- origem, destino, booking, container e referências de embarque;
+- checklist de Commercial Invoice, Packing List, Certificate of Origin, Phytosanitary Certificate e Bill of Lading;
+- custos de frete, seguro, porto, aduana, inspeção e outros com snapshot cambial;
+- resumo por período, status, país e moeda, com valor comercial, custos e margem operacional estimada;
+- isolamento multi-tenant e proteção pelo entitlement `Export`.
+
+O módulo é **operacional e gerencial**. Não substitui Siscomex, despachante aduaneiro, emissão fiscal, contratação bancária de câmbio ou documentos oficiais.
 
 ### Estoque
 
@@ -255,6 +272,7 @@ GET  /api/v1/platform/entitlements
 /api/v1/precision/*
 /api/v1/irrigation/*
 /api/v1/sustainability/*
+/api/v1/export/*
 /api/v1/inventory/*
 /api/v1/finance/*
 /api/v1/machinery/*
@@ -286,6 +304,7 @@ A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e 
 - [`docs/SPRINT_10_PRECISION_AGRICULTURE.md`](docs/SPRINT_10_PRECISION_AGRICULTURE.md)
 - [`docs/SPRINT_11_IRRIGATION.md`](docs/SPRINT_11_IRRIGATION.md)
 - [`docs/SPRINT_12_SUSTAINABILITY.md`](docs/SPRINT_12_SUSTAINABILITY.md)
+- [`docs/SPRINT_13_EXPORT.md`](docs/SPRINT_13_EXPORT.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## Roadmap resumido
@@ -303,6 +322,7 @@ A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e 
 11. ✅ **Sprint 10** — PostGIS, GeoJSON, talhões georreferenciados e mapas.
 12. ✅ **Sprint 11** — irrigação, umidade do solo, aplicações de água e manejo hídrico.
 13. ✅ **Sprint 12** — sustentabilidade, fatores de emissão, CO₂e e indicadores ambientais.
+14. ✅ **Sprint 13** — exportação, câmbio, documentos, logística e custos internacionais.
 
 O hardening que depende de ambiente real, política operacional ou testes de carga está separado no issue **#18**.
 

@@ -1,4 +1,5 @@
 using AgroControl.Domain.Modules.Crops;
+using AgroControl.Domain.Modules.Exporting;
 using AgroControl.Domain.Modules.Farms;
 using AgroControl.Domain.Modules.Fields;
 using AgroControl.Domain.Modules.Finance;
@@ -34,6 +35,10 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
     public DbSet<IrrigationApplication> IrrigationApplications => Set<IrrigationApplication>();
     public DbSet<EmissionFactor> EmissionFactors => Set<EmissionFactor>();
     public DbSet<EmissionActivity> EmissionActivities => Set<EmissionActivity>();
+    public DbSet<ExportOrder> ExportOrders => Set<ExportOrder>();
+    public DbSet<ExportDocument> ExportDocuments => Set<ExportDocument>();
+    public DbSet<ExportCost> ExportCosts => Set<ExportCost>();
+    public DbSet<ExportOrderStatusEvent> ExportOrderStatusEvents => Set<ExportOrderStatusEvent>();
     public DbSet<FinancialCategory> FinancialCategories => Set<FinancialCategory>();
     public DbSet<CostCenter> CostCenters => Set<CostCenter>();
     public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
@@ -313,6 +318,78 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
             entity.HasIndex(x => new { x.OrganizationId, x.ActivityDate });
             entity.HasIndex(x => new { x.OrganizationId, x.CategorySnapshot, x.ActivityDate });
             entity.HasIndex(x => new { x.OrganizationId, x.SourceModule, x.SourceReferenceId }).IsUnique().HasFilter("\"SourceModule\" IS NOT NULL AND \"SourceReferenceId\" IS NOT NULL");
+        });
+        modelBuilder.Entity<ExportOrder>(entity =>
+        {
+            entity.ToTable("export_orders"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.OrderNumber).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.BuyerName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.BuyerReference).HasMaxLength(120);
+            entity.Property(x => x.DestinationCountryCode).HasMaxLength(2).IsRequired();
+            entity.Property(x => x.ProductDescription).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.Quantity).HasPrecision(18, 6).IsRequired();
+            entity.Property(x => x.Unit).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.UnitPrice).HasPrecision(18, 4).IsRequired();
+            entity.Property(x => x.ExchangeRateToBrl).HasPrecision(18, 6).IsRequired();
+            entity.Property(x => x.Incoterm).HasConversion<string>().HasMaxLength(8).IsRequired();
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.OriginLocation).HasMaxLength(200);
+            entity.Property(x => x.DestinationLocation).HasMaxLength(200);
+            entity.Property(x => x.ShipmentReference).HasMaxLength(160);
+            entity.Property(x => x.BookingReference).HasMaxLength(160);
+            entity.Property(x => x.ContainerReference).HasMaxLength(160);
+            entity.Property(x => x.Notes).HasMaxLength(1200);
+            entity.Ignore(x => x.CommercialValue); entity.Ignore(x => x.EstimatedValueBrl); entity.Ignore(x => x.IsTerminal);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Crop>().WithMany().HasForeignKey(x => x.CropId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Season>().WithMany().HasForeignKey(x => x.SeasonId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.OrderNumber }).IsUnique();
+            entity.HasIndex(x => new { x.OrganizationId, x.Status, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.OrganizationId, x.DestinationCountryCode, x.CreatedAtUtc });
+            entity.HasIndex(x => x.FarmId); entity.HasIndex(x => x.FieldId); entity.HasIndex(x => x.CropId); entity.HasIndex(x => x.SeasonId);
+        });
+        modelBuilder.Entity<ExportDocument>(entity =>
+        {
+            entity.ToTable("export_documents"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(48).IsRequired();
+            entity.Property(x => x.CustomLabel).HasMaxLength(160);
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.ReferenceNumber).HasMaxLength(160);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ExportOrder>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.OrderId);
+            entity.HasIndex(x => new { x.OrganizationId, x.OrderId, x.Status });
+        });
+        modelBuilder.Entity<ExportCost>(entity =>
+        {
+            entity.ToTable("export_costs"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.Amount).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.ExchangeRateToBrl).HasPrecision(18, 6).IsRequired();
+            entity.Property(x => x.AmountBrl).HasPrecision(18, 2).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ExportOrder>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.OrderId);
+            entity.HasIndex(x => new { x.OrganizationId, x.OrderId, x.IncurredOn });
+        });
+        modelBuilder.Entity<ExportOrderStatusEvent>(entity =>
+        {
+            entity.ToTable("export_order_status_events"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.FromStatus).HasConversion<string>().HasMaxLength(32);
+            entity.Property(x => x.ToStatus).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ExportOrder>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.OrderId);
+            entity.HasIndex(x => new { x.OrganizationId, x.OrderId, x.OccurredOn });
         });
     }
 }
