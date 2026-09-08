@@ -82,8 +82,8 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
             {
                 await transaction.RollbackAsync(cancellationToken);
-                var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken)
-                    ?? throw;
+                var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken);
+                if (duplicate is null) throw;
                 return new RasterRunCreationResult(duplicate, false);
             }
             catch
