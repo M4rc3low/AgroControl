@@ -8,6 +8,7 @@ import { ModulesPage } from './pages/ModulesPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PrecisionAgriculturePage } from './pages/PrecisionAgriculturePage';
 import { IrrigationPage } from './pages/IrrigationPage';
+import { SustainabilityPage } from './pages/SustainabilityPage';
 import { ProductionPage } from './pages/ProductionPage';
 import { RegisterPage } from './pages/RegisterPage';
 
@@ -35,6 +36,7 @@ export function App() {
           <Route path="production" element={<ProductionPage />} />
           <Route path="precision" element={<PrecisionAgriculturePage />} />
           <Route path="irrigation" element={<IrrigationPage />} />
+          <Route path="sustainability" element={<SustainabilityPage />} />
           <Route path="inventory" element={<ModulePage moduleKey="Inventory" title="Estoque" description="Insumos, depósitos, movimentações e alertas de estoque baixo." />} />
           <Route path="finance" element={<ModulePage moduleKey="Finance" title="Financeiro" description="Custos, receitas, compromissos, resultado e rentabilidade da operação." />} />
           <Route path="machinery" element={<ModulePage moduleKey="Machinery" title="Máquinas" description="Máquinas, horímetro, combustível, manutenção e custo operacional." />} />

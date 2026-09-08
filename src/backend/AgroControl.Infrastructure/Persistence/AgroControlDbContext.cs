@@ -10,6 +10,7 @@ using AgroControl.Domain.Modules.Market;
 using AgroControl.Domain.Modules.Organizations;
 using AgroControl.Domain.Modules.Seasons;
 using AgroControl.Domain.Modules.Subscriptions;
+using AgroControl.Domain.Modules.Sustainability;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgroControl.Infrastructure.Persistence;
@@ -31,6 +32,8 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<IrrigationZone> IrrigationZones => Set<IrrigationZone>();
     public DbSet<IrrigationApplication> IrrigationApplications => Set<IrrigationApplication>();
+    public DbSet<EmissionFactor> EmissionFactors => Set<EmissionFactor>();
+    public DbSet<EmissionActivity> EmissionActivities => Set<EmissionActivity>();
     public DbSet<FinancialCategory> FinancialCategories => Set<FinancialCategory>();
     public DbSet<CostCenter> CostCenters => Set<CostCenter>();
     public DbSet<FinancialTransaction> FinancialTransactions => Set<FinancialTransaction>();
@@ -268,6 +271,48 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
             entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.FieldId); entity.HasIndex(x => x.ZoneId);
             entity.HasIndex(x => new { x.OrganizationId, x.ZoneId, x.StartedAtUtc });
+        });
+        modelBuilder.Entity<EmissionFactor>(entity =>
+        {
+            entity.ToTable("emission_factors"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.Category).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Unit).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.KgCo2ePerUnit).HasPrecision(18, 6).IsRequired();
+            entity.Property(x => x.MethodologyReference).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Name }).IsUnique();
+            entity.HasIndex(x => new { x.OrganizationId, x.Category, x.IsActive });
+        });
+        modelBuilder.Entity<EmissionActivity>(entity =>
+        {
+            entity.ToTable("emission_activities"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.FactorNameSnapshot).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.CategorySnapshot).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.UnitSnapshot).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.FactorKgCo2ePerUnitSnapshot).HasPrecision(18, 6).IsRequired();
+            entity.Property(x => x.Quantity).HasPrecision(18, 6).IsRequired();
+            entity.Property(x => x.EmissionsKgCo2e).HasPrecision(18, 6).IsRequired();
+            entity.Property(x => x.Origin).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.DataQuality).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(240).IsRequired();
+            entity.Property(x => x.SourceModule).HasMaxLength(64);
+            entity.Property(x => x.SourceReferenceId).HasMaxLength(160);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Ignore(x => x.EmissionsTCo2e);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<EmissionFactor>().WithMany().HasForeignKey(x => x.EmissionFactorId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Farm>().WithMany().HasForeignKey(x => x.FarmId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Season>().WithMany().HasForeignKey(x => x.SeasonId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => x.EmissionFactorId);
+            entity.HasIndex(x => x.FarmId); entity.HasIndex(x => x.FieldId); entity.HasIndex(x => x.SeasonId);
+            entity.HasIndex(x => new { x.OrganizationId, x.ActivityDate });
+            entity.HasIndex(x => new { x.OrganizationId, x.CategorySnapshot, x.ActivityDate });
+            entity.HasIndex(x => new { x.OrganizationId, x.SourceModule, x.SourceReferenceId }).IsUnique().HasFilter("\"SourceModule\" IS NOT NULL AND \"SourceReferenceId\" IS NOT NULL");
         });
     }
 }
