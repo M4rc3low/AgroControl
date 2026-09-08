@@ -1,13 +1,14 @@
 [project]
 name = "agrocontrol-intelligence"
-version = "0.1.0"
-description = "AgroControl Intelligence service for reproducible agricultural analytics and yield prediction."
+version = "0.2.0"
+description = "AgroControl Intelligence service for reproducible agricultural analytics, yield prediction and raster processing."
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1.0",
   "uvicorn[standard]>=0.30,<1.0",
   "numpy>=2.0,<3.0",
   "scikit-learn>=1.6,<2.0",
+  "rasterio>=1.4,<2.0",
   "opentelemetry-api>=1.30,<2.0",
   "opentelemetry-sdk>=1.30,<2.0",
   "opentelemetry-exporter-otlp-proto-http>=1.30,<2.0",
