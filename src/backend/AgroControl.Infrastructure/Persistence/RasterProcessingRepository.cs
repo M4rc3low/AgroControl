@@ -214,7 +214,6 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
         DateTime? toUtc, CancellationToken cancellationToken = default)
     {
         const string filter = """
-            FROM raster_zonal_results AS z
             WHERE z."OrganizationId" = @organizationId
               AND (CAST(@fieldId AS uuid) IS NULL OR z."FieldId" = CAST(@fieldId AS uuid))
               AND (CAST(@seasonId AS uuid) IS NULL OR z."SeasonId" = CAST(@seasonId AS uuid))
@@ -229,7 +228,7 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
             AddParameter(command, "seasonId", seasonId); AddParameter(command, "managementZoneId", managementZoneId);
             AddParameter(command, "indexType", indexType); AddParameter(command, "fromUtc", fromUtc); AddParameter(command, "toUtc", toUtc);
         }
-        var total = await ExecuteCountAsync("SELECT COUNT(*) " + filter + ";", Configure, cancellationToken);
+        var total = await ExecuteCountAsync("SELECT COUNT(*) FROM raster_zonal_results AS z " + filter + ";", Configure, cancellationToken);
         var items = await QueryResultsManyAsync(ResultSelect + filter + " ORDER BY z.\"ObservedAtUtc\" DESC, z.\"CreatedAtUtc\" DESC LIMIT @take OFFSET @skip;",
             command => { Configure(command); AddParameter(command, "take", take); AddParameter(command, "skip", skip); }, cancellationToken);
         return (items, total);
