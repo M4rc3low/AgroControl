@@ -10,6 +10,8 @@ replicas:
     count: 1
   - name: agrocontrol-telemetry
     count: 1
+  - name: agrocontrol-web
+    count: 1
 
 images:
   - name: ghcr.io/m4rc3low/agrocontrol-api
@@ -20,4 +22,7 @@ images:
     newTag: local
   - name: ghcr.io/m4rc3low/agrocontrol-telemetry
     newName: agrocontrol-telemetry
+    newTag: local
+  - name: ghcr.io/m4rc3low/agrocontrol-web
+    newName: agrocontrol-web
     newTag: local

@@ -10,6 +10,7 @@ on:
       - "src/backend/AgroControl.Api/Dockerfile"
       - "src/intelligence/Dockerfile"
       - "src/telemetry/Dockerfile"
+      - "src/frontend/**"
       - ".github/workflows/platform-ci.yml"
   pull_request:
     paths:
@@ -20,12 +21,13 @@ on:
       - "src/backend/AgroControl.Api/Dockerfile"
       - "src/intelligence/Dockerfile"
       - "src/telemetry/Dockerfile"
+      - "src/frontend/**"
       - ".github/workflows/platform-ci.yml"
 
 jobs:
   integrated-platform:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -49,7 +51,7 @@ jobs:
           test -s /tmp/agrocontrol-k8s-local.yml
 
       - name: Build application images
-        run: docker compose build api intelligence telemetry
+        run: docker compose build api intelligence telemetry web
 
       - name: Start integrated stack
         env:
@@ -59,10 +61,11 @@ jobs:
       - name: Wait for application readiness
         run: |
           set -euo pipefail
-          for attempt in {1..60}; do
+          for attempt in {1..70}; do
             if curl --fail --silent http://127.0.0.1:8090/health/ready >/dev/null \
               && curl --fail --silent http://127.0.0.1:8100/actuator/health/readiness >/dev/null \
-              && curl --fail --silent http://127.0.0.1:8080/health/ready >/dev/null; then
+              && curl --fail --silent http://127.0.0.1:8080/health/ready >/dev/null \
+              && curl --fail --silent http://127.0.0.1:3001/ >/dev/null; then
               exit 0
             fi
             sleep 3
@@ -76,9 +79,13 @@ jobs:
           curl --fail --silent http://127.0.0.1:8080/ >/tmp/api.json
           curl --fail --silent http://127.0.0.1:8080/api/v1/platform/modules >/tmp/modules.json
           curl --fail --silent http://127.0.0.1:8090/api/v1/model >/tmp/model.json
+          curl --fail --silent http://127.0.0.1:3001/ >/tmp/web.html
+          curl --fail --silent http://127.0.0.1:3001/api/v1/platform/modules >/tmp/web-proxy-modules.json
           grep -q 'AgroControl.Api' /tmp/api.json
           grep -q 'Telemetry' /tmp/modules.json
           grep -q 'AgroControl.Intelligence' /tmp/model.json
+          grep -q 'AgroControl' /tmp/web.html
+          grep -q 'Telemetry' /tmp/web-proxy-modules.json
 
       - name: Wait for observability stack
         run: |

@@ -126,6 +126,25 @@ services:
       timeout: 5s
       retries: 20
 
+  web:
+    build:
+      context: .
+      dockerfile: src/frontend/Dockerfile
+    container_name: agrocontrol-web
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: api:8080
+    ports:
+      - "${WEB_PORT:-3001}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   tempo:
     image: grafana/tempo:2.7.2
     container_name: agrocontrol-tempo

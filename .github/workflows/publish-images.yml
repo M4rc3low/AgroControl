@@ -26,6 +26,9 @@ jobs:
           - service: telemetry
             dockerfile: src/telemetry/Dockerfile
             image: agrocontrol-telemetry
+          - service: web
+            dockerfile: src/frontend/Dockerfile
+            image: agrocontrol-web
 
     steps:
       - name: Checkout

@@ -1,8 +1,8 @@
 # AgroControl
 
-**AgroControl** é uma plataforma modular para gestão, inteligência e tecnologia no agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**; responsabilidades tecnicamente distintas são isoladas em serviços especializados: **Python / FastAPI** para inteligência de dados e **Java / Spring Boot** para telemetria e IoT.
+**AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 8 concluída — observabilidade, CI/CD, segurança operacional e Kubernetes**
+> Status atual: **Sprint 9 — AgroControl Web implementado e integrado à plataforma técnica**
 
 ## Objetivo
 
@@ -23,7 +23,7 @@ Os módulos são liberados por plano e o bloqueio é validado no backend, não a
 
 | Camada | Tecnologia |
 |---|---|
-| Frontend | React + TypeScript (planejado) |
+| Web | React 19 + TypeScript 7 + Vite 8 |
 | API principal | C# + ASP.NET Core / .NET 10 |
 | Banco principal | PostgreSQL + Entity Framework Core |
 | Inteligência | Python 3.12 + FastAPI + scikit-learn |
@@ -40,7 +40,8 @@ Os módulos são liberados por plano e o bloqueio é validado no backend, não a
 
 ```mermaid
 flowchart TB
-    UI[React + TypeScript] --> API[AgroControl API\nC# / ASP.NET Core]
+    BROWSER[Navegador] --> WEB[AgroControl Web\nReact + TypeScript + Nginx]
+    WEB --> API[AgroControl API\nC# / ASP.NET Core]
     API --> DB[(PostgreSQL Core)]
     API --> AI[AgroControl Intelligence\nPython / FastAPI]
     API --> TEL[AgroControl Telemetry\nJava / Spring Boot]
@@ -58,9 +59,25 @@ flowchart TB
     TEMPO --> GRAFANA
 ```
 
-A API principal concentra identidade, assinatura, autorização, `OrganizationId` e regras centrais de negócio. Python cuida de análise/modelagem. Java cuida de ingestão, normalização e histórico de telemetria e **não escreve diretamente no schema do monólito**.
+A aplicação web mantém o navegador no mesmo origin para `/api`; a API concentra identidade, assinatura, autorização, `OrganizationId` e regras centrais. Python cuida de análise/modelagem. Java cuida de ingestão e histórico de telemetria sem escrever diretamente no schema do monólito.
 
 ## Funcionalidades implementadas
+
+### AgroControl Web
+
+- registro inicial de organização e usuário;
+- login, logout e sessão JWT com expiração;
+- rotas privadas;
+- contexto de organização, papel, plano e entitlements;
+- sidebar e topbar responsivos;
+- catálogo visual de módulos e estados bloqueados;
+- dashboard com propriedades, área, talhões, safras, estoque baixo e resumo financeiro;
+- CRUD web de propriedades, talhões, culturas e safras;
+- formulários, filtros, estados de loading/erro/vazio e desativação;
+- layout para desktop, tablet e mobile;
+- proxy reverso same-origin no Nginx.
+
+O frontend melhora a experiência, mas **não substitui as validações de autorização do backend**.
 
 ### Plataforma, identidade e multi-tenancy
 
@@ -123,7 +140,6 @@ A previsão é **apoio à decisão** e não substitui avaliação agronômica pr
 - última leitura e histórico por período/métrica;
 - MQTT com QoS 1 e reconexão automática;
 - tópico `agrocontrol/v1/devices/{deviceId}/telemetry`;
-- validação de timestamp, valor, unidade, coordenadas, metadata e tamanho de payload;
 - API interna com credencial serviço-a-serviço;
 - endpoints externos protegidos por JWT + entitlement `Telemetry`.
 
@@ -135,13 +151,12 @@ O Mosquitto do repositório é **somente para desenvolvimento**. Produção exig
 - traces distribuídos nas chamadas HTTP instrumentadas;
 - logs JSON na API principal;
 - liveness e readiness separados;
-- readiness da API validando PostgreSQL;
-- Spring Boot Actuator + Prometheus no Telemetry;
 - OpenTelemetry Collector, Tempo, Prometheus e Grafana em profile opcional;
 - dashboard operacional provisionado automaticamente;
-- Platform CI com build e smoke test da stack integrada;
-- Dependabot e CodeQL para C#, Java/Kotlin e Python;
-- publicação de imagens preparada no GHCR por SHA/SemVer com provenance e SBOM;
+- pipelines independentes para backend, Intelligence, Telemetry, frontend e plataforma integrada;
+- Dependabot para NuGet, pip, Maven, npm e GitHub Actions;
+- CodeQL para C#, Java/Kotlin, Python e JavaScript/TypeScript;
+- publicação das quatro imagens no GHCR por SHA/SemVer com provenance e SBOM;
 - Kubernetes com Kustomize, probes, resources, security context e PDB;
 - PostgreSQL e MQTT de produção deliberadamente fora dos manifests simplificados.
 
@@ -155,6 +170,7 @@ docker compose up --build
 Serviços padrão:
 
 ```text
+AgroControl Web          http://localhost:3001
 AgroControl API          http://localhost:8080
 AgroControl Intelligence http://localhost:8090
 AgroControl Telemetry    http://localhost:8100
@@ -163,7 +179,7 @@ PostgreSQL Telemetry     localhost:5433
 MQTT / Mosquitto         localhost:1883
 ```
 
-Para ativar a stack de observabilidade:
+Para ativar observabilidade:
 
 ```bash
 OTEL_ENABLED=true docker compose --profile observability up --build
@@ -187,6 +203,7 @@ Intelligence GET /health/ready
 Telemetry    GET /actuator/health/liveness
 Telemetry    GET /actuator/health/readiness
 Telemetry    GET /actuator/prometheus
+Web          GET /
 ```
 
 ## Endpoints principais
@@ -211,12 +228,6 @@ POST /api/v1/intelligence/seasons/{seasonId}/yield-prediction
 /api/v1/telemetry/*
 ```
 
-Swagger UI do Telemetry:
-
-```text
-http://localhost:8100/swagger-ui.html
-```
-
 ## Kubernetes
 
 A base fica em `k8s/` e pode ser renderizada sem aplicar recursos:
@@ -226,26 +237,25 @@ kubectl kustomize k8s/base
 kubectl kustomize k8s/overlays/local
 ```
 
-Consulte [`k8s/README.md`](k8s/README.md) antes de implantar. Segredos reais não entram no repositório.
+A web possui Deployment/Service próprios e aponta para `agrocontrol-api:8080`. Segredos reais não entram no repositório.
 
 ## Qualidade e CI/CD
 
 - **Backend CI:** PostgreSQL 17, restore, build e testes .NET;
-- **Intelligence CI:** Ruff, pytest, build de imagem e smoke test;
-- **Telemetry CI:** Maven, PostgreSQL 17, build de imagem e MQTT ponta a ponta;
-- **Platform CI:** Docker Compose completo, observabilidade, Kustomize e smoke tests integrados;
-- **CodeQL:** C#, Java/Kotlin e Python;
-- **Dependabot:** NuGet, pip, Maven e GitHub Actions.
-
-A Sprint 8 foi integrada após todos os checks do PR #17 concluírem com sucesso.
+- **Intelligence CI:** Ruff, pytest, imagem e smoke test;
+- **Telemetry CI:** Maven, PostgreSQL 17, imagem e MQTT ponta a ponta;
+- **Frontend CI:** `npm ci`, type-check, Vitest, build, imagem e smoke test;
+- **Platform CI:** Docker Compose completo, web, observabilidade, Kustomize e smoke tests integrados;
+- **CodeQL:** C#, Java/Kotlin, Python e JavaScript/TypeScript;
+- **Dependabot:** NuGet, pip, Maven, npm e GitHub Actions.
 
 ## Documentação
 
 - [`docs/SPRINT_6_INTELLIGENCE.md`](docs/SPRINT_6_INTELLIGENCE.md)
 - [`docs/SPRINT_7_TELEMETRY.md`](docs/SPRINT_7_TELEMETRY.md)
 - [`docs/SPRINT_8_PLATFORM_DEVOPS.md`](docs/SPRINT_8_PLATFORM_DEVOPS.md)
+- [`docs/SPRINT_9_WEB.md`](docs/SPRINT_9_WEB.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- [`docs/adr/ADR-005-observability-and-kubernetes.md`](docs/adr/ADR-005-observability-and-kubernetes.md)
 
 ## Roadmap resumido
 
@@ -258,13 +268,16 @@ A Sprint 8 foi integrada após todos os checks do PR #17 concluírem com sucesso
 7. ✅ **Sprint 6** — Python / Intelligence.
 8. ✅ **Sprint 7** — Java / Telemetry / MQTT.
 9. ✅ **Sprint 8** — observabilidade, CI/CD, segurança operacional e Kubernetes.
+10. 🚀 **Sprint 9** — AgroControl Web, autenticação, dashboard e produção rural no navegador.
 
 O hardening que depende de ambiente real, política operacional ou testes de carga está separado no issue **#18**.
 
 ## Segurança
 
-Defaults presentes no repositório são apenas para desenvolvimento. Em produção, `JWT_KEY`, `TELEMETRY_INTERNAL_API_KEY`, credenciais de banco e credenciais/certificados MQTT devem ser fornecidos por um mecanismo apropriado de secrets management.
+Defaults do repositório são apenas de desenvolvimento. Em produção, `JWT_KEY`, `TELEMETRY_INTERNAL_API_KEY`, credenciais de banco e credenciais/certificados MQTT devem vir de secrets management apropriado.
+
+O JWT do frontend usa `sessionStorage` por compatibilidade com o contrato bearer atual. A evolução para BFF/cookie HttpOnly pode ser adotada quando a exposição pública e o modelo de sessão justificarem esse endurecimento.
 
 ## Licença
 
-A licença ainda não foi definida. Não adicione uma licença pública ao projeto sem decidir antes o modelo de distribuição do AgroControl.
+A licença ainda não foi definida. Não adicione licença pública ao projeto sem decidir antes o modelo de distribuição do AgroControl.

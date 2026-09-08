@@ -17,3 +17,13 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: agrocontrol-intelligence
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agrocontrol-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agrocontrol-web

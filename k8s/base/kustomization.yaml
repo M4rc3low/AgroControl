@@ -7,4 +7,5 @@ resources:
   - api.yaml
   - intelligence.yaml
   - telemetry.yaml
+  - web.yaml
   - pdb.yaml

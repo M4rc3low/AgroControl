@@ -1,0 +1,65 @@
+name: Frontend CI
+
+on:
+  push:
+    paths:
+      - "src/frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  pull_request:
+    paths:
+      - "src/frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Build container image
+        working-directory: .
+        run: docker build -f src/frontend/Dockerfile -t agrocontrol-web:test .
+
+      - name: Smoke test web image
+        working-directory: .
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name agrocontrol-web-test --add-host api:127.0.0.1 -p 4173:8080 agrocontrol-web:test
+          trap 'docker stop agrocontrol-web-test >/dev/null 2>&1 || true' EXIT
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/tmp/agrocontrol-web.html; then
+              grep -q 'AgroControl' /tmp/agrocontrol-web.html
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs agrocontrol-web-test
+          exit 1
