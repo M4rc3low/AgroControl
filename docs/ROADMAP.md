@@ -217,6 +217,28 @@
 - [x] testes unitários, integração PostGIS e testes frontend;
 - [x] documentação `SPRINT_15_GEOSPATIAL_ZONES.md`.
 
+## Sprint 16 — Sensoriamento remoto e índices vegetativos ✅
+
+- [x] cenas de satélite, drone e outras plataformas isoladas por `OrganizationId`;
+- [x] vínculo obrigatório com Field e opcional com Season da mesma organização;
+- [x] provedor, identificador externo e idempotência por organização/provedor/id;
+- [x] aquisição UTC, cobertura de nuvens, resolução espacial e referência de asset;
+- [x] footprint opcional WGS84/PostGIS e índice espacial GiST;
+- [x] `VegetationIndexObservation` append-only;
+- [x] índices `NDVI`, `NDRE`, `EVI` e `Custom`;
+- [x] mínimo, máximo, média, mediana, desvio-padrão, cobertura válida e amostras;
+- [x] snapshot de fonte e data da cena em cada observação;
+- [x] vínculo opcional com ManagementZone do mesmo talhão;
+- [x] validação de faixa normalizada para índices padronizados;
+- [x] séries temporais por talhão, safra, zona e índice;
+- [x] resumo com latest metric por índice e contagem de cenas;
+- [x] API `/api/v1/precision/remote-sensing/*` protegida por `PrecisionAgriculture`;
+- [x] workspace web com filtros, cards, timeline, gráfico temporal e mapa;
+- [x] raster pesado mantido fora do banco relacional principal;
+- [x] migration SQL `20260908150000_RemoteSensingCore` e estratégia espacial documentada;
+- [x] testes unitários, integração PostgreSQL/PostGIS e testes frontend;
+- [x] documentação `SPRINT_16_REMOTE_SENSING.md` e versão API `0.16.0`.
+
 ## Próximos aprimoramentos
 
-O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para imagens de satélite/drone, índices vegetativos, processamento raster, importação KML/Shapefile e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.
+O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para processamento raster no AgroControl Intelligence/Python, estatística zonal sobre talhões e zonas de manejo, integração com provedores de imagens, máscaras de qualidade/nuvem, importação KML/Shapefile e aprofundamento agronômico, mantendo essas responsabilidades separadas do monólito transacional.
