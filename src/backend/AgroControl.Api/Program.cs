@@ -15,6 +15,7 @@ using AgroControl.Application.Market;
 using AgroControl.Application.Platform;
 using AgroControl.Application.PrecisionAgriculture;
 using AgroControl.Application.Production;
+using AgroControl.Application.RegionalOperations;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Application.Sustainability;
 using AgroControl.Domain.Platform;
@@ -42,6 +43,7 @@ builder.Services.AddSingleton<PlanEntitlementCatalog>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<ModuleAccessService>();
 builder.Services.AddScoped<FarmService>();
+builder.Services.AddScoped<MultiFarmService>();
 builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<SeasonService>();
@@ -106,7 +108,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.17.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.18.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -157,6 +159,7 @@ authorized.MapGet("/platform/modules/{moduleKey}/access", async (string moduleKe
 });
 
 app.MapProductionEndpoints();
+app.MapMultiFarmEndpoints();
 app.MapInventoryEndpoints();
 app.MapFinanceEndpoints();
 app.MapMachineryEndpoints();

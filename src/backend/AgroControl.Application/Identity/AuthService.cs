@@ -2,8 +2,10 @@ using System.Globalization;
 using System.Text;
 using AgroControl.Application.Common;
 using AgroControl.Application.Subscriptions;
+using AgroControl.Application.RegionalOperations;
 using AgroControl.Domain.Modules.Identity;
 using AgroControl.Domain.Modules.Organizations;
+using AgroControl.Domain.Modules.Operations;
 using AgroControl.Domain.Modules.Subscriptions;
 
 namespace AgroControl.Application.Identity;
@@ -12,6 +14,7 @@ public sealed class AuthService
 {
     private readonly IIdentityRepository _identityRepository;
     private readonly ISubscriptionRepository _subscriptionRepository;
+    private readonly IMultiFarmRepository _multiFarmRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
     private readonly IUnitOfWork _unitOfWork;
@@ -19,12 +22,14 @@ public sealed class AuthService
     public AuthService(
         IIdentityRepository identityRepository,
         ISubscriptionRepository subscriptionRepository,
+        IMultiFarmRepository multiFarmRepository,
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
         IUnitOfWork unitOfWork)
     {
         _identityRepository = identityRepository;
         _subscriptionRepository = subscriptionRepository;
+        _multiFarmRepository = multiFarmRepository;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
         _unitOfWork = unitOfWork;
@@ -68,11 +73,13 @@ public sealed class AuthService
             now);
 
         var subscription = Subscription.CreateBasic(organization.Id, now);
+        var allFarmsAccess = FarmAccessAssignment.CreateAllFarms(organization.Id, user.Id, user.Id, now);
 
         _identityRepository.Add(organization);
         _identityRepository.Add(user);
         _identityRepository.Add(membership);
         _subscriptionRepository.Add(subscription);
+        _multiFarmRepository.AddAssignment(allFarmsAccess);
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 

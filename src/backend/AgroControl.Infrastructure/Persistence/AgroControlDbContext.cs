@@ -10,6 +10,7 @@ using AgroControl.Domain.Modules.Irrigation;
 using AgroControl.Domain.Modules.Machinery;
 using AgroControl.Domain.Modules.Market;
 using AgroControl.Domain.Modules.Organizations;
+using AgroControl.Domain.Modules.Operations;
 using AgroControl.Domain.Modules.Seasons;
 using AgroControl.Domain.Modules.Subscriptions;
 using AgroControl.Domain.Modules.Sustainability;
@@ -22,6 +23,8 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<User> Users => Set<User>();
     public DbSet<OrganizationMembership> OrganizationMemberships => Set<OrganizationMembership>();
+    public DbSet<OperationalRegion> OperationalRegions => Set<OperationalRegion>();
+    public DbSet<FarmAccessAssignment> FarmAccessAssignments => Set<FarmAccessAssignment>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<OrganizationModuleEntitlement> OrganizationModuleEntitlements => Set<OrganizationModuleEntitlement>();
     public DbSet<Farm> Farms => Set<Farm>();
@@ -76,6 +79,29 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
             entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade); entity.HasIndex(x => x.UserId);
         });
+        modelBuilder.Entity<OperationalRegion>(entity =>
+        {
+            entity.ToTable("operational_regions"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.Code).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Code }).IsUnique();
+            entity.HasIndex(x => new { x.OrganizationId, x.IsActive });
+        });
+        modelBuilder.Entity<FarmAccessAssignment>(entity =>
+        {
+            entity.ToTable("farm_access_assignments"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.ScopeType).HasConversion<string>().HasMaxLength(32).IsRequired();
+            entity.Property(x => x.ScopeKey).HasMaxLength(100).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.TargetId);
+            entity.HasIndex(x => new { x.OrganizationId, x.UserId, x.ScopeKey }).IsUnique().HasFilter("\"IsActive\" = TRUE");
+        });
         modelBuilder.Entity<Subscription>(entity =>
         {
             entity.ToTable("subscriptions"); entity.HasKey(x => x.Id);
@@ -90,8 +116,24 @@ public sealed class AgroControlDbContext(DbContextOptions<AgroControlDbContext> 
         });
         modelBuilder.Entity<Farm>(entity =>
         {
-            entity.ToTable("farms"); entity.HasKey(x => x.Id); entity.Property(x => x.Name).HasMaxLength(160).IsRequired(); entity.Property(x => x.TotalAreaHectares).HasPrecision(18, 4).IsRequired(); entity.Property(x => x.City).HasMaxLength(120); entity.Property(x => x.State).HasMaxLength(80);
-            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade); entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => new { x.OrganizationId, x.Name });
+            entity.ToTable("farms"); entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.TotalAreaHectares).HasPrecision(18, 4).IsRequired();
+            entity.Property(x => x.City).HasMaxLength(120);
+            entity.Property(x => x.State).HasMaxLength(80);
+            entity.Property(x => x.CountryCode).HasMaxLength(2).IsRequired();
+            entity.Property(x => x.StateCode).HasMaxLength(2);
+            entity.Property(x => x.MunicipalityCode).HasMaxLength(24);
+            entity.Property(x => x.PostalCode).HasMaxLength(20);
+            entity.Property(x => x.Latitude).HasPrecision(9, 6);
+            entity.Property(x => x.Longitude).HasPrecision(9, 6);
+            entity.Property(x => x.TimeZoneId).HasMaxLength(80).IsRequired();
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<OperationalRegion>().WithMany().HasForeignKey(x => x.OperationalRegionId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => x.OperationalRegionId);
+            entity.HasIndex(x => new { x.OrganizationId, x.Name });
+            entity.HasIndex(x => new { x.OrganizationId, x.CountryCode, x.StateCode });
         });
         modelBuilder.Entity<Field>(entity =>
         {
