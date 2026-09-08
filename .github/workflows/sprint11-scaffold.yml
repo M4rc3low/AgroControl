@@ -1,0 +1,70 @@
+name: Sprint 11 Scaffold
+
+on:
+  push:
+    branches: ["feat/sprint-11-irrigation"]
+    paths: [".github/workflows/sprint11-scaffold.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/sprint-11-irrigation
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Wire irrigation module
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p=Path(path); s=p.read_text()
+              if old not in s: raise SystemExit(f'marker not found: {path}: {old[:60]}')
+              p.write_text(s.replace(old,new,1))
+
+          # DbContext usings + DbSets + mappings
+          p=Path('src/backend/AgroControl.Infrastructure/Persistence/AgroControlDbContext.cs')
+          s=p.read_text()
+          s=s.replace('using AgroControl.Domain.Modules.Inventory;\n', 'using AgroControl.Domain.Modules.Inventory;\nusing AgroControl.Domain.Modules.Irrigation;\n',1)
+          s=s.replace('    public DbSet<StockMovement> StockMovements => Set<StockMovement>();\n', '    public DbSet<StockMovement> StockMovements => Set<StockMovement>();\n    public DbSet<IrrigationZone> IrrigationZones => Set<IrrigationZone>();\n    public DbSet<IrrigationApplication> IrrigationApplications => Set<IrrigationApplication>();\n',1)
+          marker='    }\n}'
+          idx=s.rfind(marker)
+          mapping='''        modelBuilder.Entity<IrrigationZone>(entity =>\n        {\n            entity.ToTable("irrigation_zones"); entity.HasKey(x => x.Id);\n            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();\n            entity.Property(x => x.AreaHectares).HasPrecision(18, 4).IsRequired();\n            entity.Property(x => x.Method).HasConversion<string>().HasMaxLength(32).IsRequired();\n            entity.Property(x => x.MinimumMoisturePercent).HasPrecision(5, 2).IsRequired();\n            entity.Property(x => x.TargetMoisturePercent).HasPrecision(5, 2).IsRequired();\n            entity.Property(x => x.MaximumMoisturePercent).HasPrecision(5, 2).IsRequired();\n            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);\n            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.FieldId);\n            entity.HasIndex(x => new { x.OrganizationId, x.FieldId, x.IsActive });\n        });\n        modelBuilder.Entity<IrrigationApplication>(entity =>\n        {\n            entity.ToTable("irrigation_applications"); entity.HasKey(x => x.Id);\n            entity.Property(x => x.AreaHectaresSnapshot).HasPrecision(18, 4).IsRequired();\n            entity.Property(x => x.DepthMillimeters).HasPrecision(18, 3).IsRequired();\n            entity.Property(x => x.EstimatedVolumeCubicMeters).HasPrecision(18, 3).IsRequired();\n            entity.Property(x => x.Source).HasConversion<string>().HasMaxLength(32).IsRequired();\n            entity.Property(x => x.Notes).HasMaxLength(1000);\n            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);\n            entity.HasOne<IrrigationZone>().WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);\n            entity.HasOne<Field>().WithMany().HasForeignKey(x => x.FieldId).OnDelete(DeleteBehavior.Restrict);\n            entity.HasIndex(x => x.OrganizationId); entity.HasIndex(x => x.FieldId); entity.HasIndex(x => x.ZoneId);\n            entity.HasIndex(x => new { x.OrganizationId, x.ZoneId, x.StartedAtUtc });\n        });\n'''
+          s=s[:idx]+mapping+s[idx:]
+          p.write_text(s)
+
+          replace('src/backend/AgroControl.Infrastructure/DependencyInjection.cs', 'using AgroControl.Application.Inventory;\n', 'using AgroControl.Application.Inventory;\nusing AgroControl.Application.Irrigation;\n')
+          replace('src/backend/AgroControl.Infrastructure/DependencyInjection.cs', '        services.AddScoped<IInventoryRepository, InventoryRepository>();\n', '        services.AddScoped<IInventoryRepository, InventoryRepository>();\n        services.AddScoped<IIrrigationRepository, IrrigationRepository>();\n')
+
+          replace('src/backend/AgroControl.Api/Program.cs', 'using AgroControl.Application.Inventory;\n', 'using AgroControl.Application.Inventory;\nusing AgroControl.Application.Irrigation;\n')
+          replace('src/backend/AgroControl.Api/Program.cs', 'builder.Services.AddScoped<InventoryService>();\n', 'builder.Services.AddScoped<InventoryService>();\nbuilder.Services.AddScoped<IrrigationService>();\n')
+          replace('src/backend/AgroControl.Api/Program.cs', 'version = "0.10.0"', 'version = "0.11.0"')
+          replace('src/backend/AgroControl.Api/Program.cs', 'app.MapPrecisionAgricultureEndpoints();\n', 'app.MapPrecisionAgricultureEndpoints();\napp.MapIrrigationEndpoints();\n')
+
+          replace('src/backend/AgroControl.Application/Platform/ModuleCatalog.cs', 'new(ModuleKey.Irrigation, "Irrigation", ModuleStatus.Locked, "Irrigação, clima e umidade."),', 'new(ModuleKey.Irrigation, "Irrigation", ModuleStatus.Active, "Zonas de irrigação, umidade do solo e manejo hídrico."),')
+
+          replace('src/frontend/src/App.tsx', "import { PrecisionAgriculturePage } from './pages/PrecisionAgriculturePage';\n", "import { PrecisionAgriculturePage } from './pages/PrecisionAgriculturePage';\nimport { IrrigationPage } from './pages/IrrigationPage';\n")
+          replace('src/frontend/src/App.tsx', '          <Route path="precision" element={<PrecisionAgriculturePage />} />\n', '          <Route path="precision" element={<PrecisionAgriculturePage />} />\n          <Route path="irrigation" element={<IrrigationPage />} />\n')
+          replace('src/frontend/src/components/AppShell.tsx', "  { to: '/precision', label: 'Agricultura de precisão', icon: 'map' as const, module: 'PrecisionAgriculture' },\n", "  { to: '/precision', label: 'Agricultura de precisão', icon: 'map' as const, module: 'PrecisionAgriculture' },\n  { to: '/irrigation', label: 'Irrigação', icon: 'droplet' as const, module: 'Irrigation' },\n")
+          replace('src/frontend/src/components/Icon.tsx', "'leaf' | 'map' | 'box'", "'leaf' | 'map' | 'droplet' | 'box'")
+          replace('src/frontend/src/components/Icon.tsx', "  map: ['M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3Z', 'M9 3v15', 'M15 6v15'],\n", "  map: ['M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3Z', 'M9 3v15', 'M15 6v15'],\n  droplet: ['M12 2s7 7.2 7 12a7 7 0 1 1-14 0C5 9.2 12 2 12 2Z', 'M9 16c.7 1 1.7 1.5 3 1.5'],\n")
+          PY
+      - name: Install EF tool
+        run: dotnet tool install --global dotnet-ef --version 10.0.0
+      - name: Generate IrrigationCore migration
+        run: dotnet ef migrations add IrrigationCore --project src/backend/AgroControl.Infrastructure --startup-project src/backend/AgroControl.Api
+      - name: Validate backend
+        run: dotnet build AgroControl.sln --configuration Release
+      - name: Commit generated wiring and migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests
+          git commit -m "feat(irrigation): wire module and generate migration"
+          git push origin HEAD:feat/sprint-11-irrigation
