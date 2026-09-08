@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ModulePage } from './pages/ModulePage';
 import { ModulesPage } from './pages/ModulesPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { PrecisionAgriculturePage } from './pages/PrecisionAgriculturePage';
 import { ProductionPage } from './pages/ProductionPage';
 import { RegisterPage } from './pages/RegisterPage';
 
@@ -31,6 +32,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<DashboardPage />} />
           <Route path="production" element={<ProductionPage />} />
+          <Route path="precision" element={<PrecisionAgriculturePage />} />
           <Route path="inventory" element={<ModulePage moduleKey="Inventory" title="Estoque" description="Insumos, depósitos, movimentações e alertas de estoque baixo." />} />
           <Route path="finance" element={<ModulePage moduleKey="Finance" title="Financeiro" description="Custos, receitas, compromissos, resultado e rentabilidade da operação." />} />
           <Route path="machinery" element={<ModulePage moduleKey="Machinery" title="Máquinas" description="Máquinas, horímetro, combustível, manutenção e custo operacional." />} />
