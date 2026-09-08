@@ -1,0 +1,54 @@
+name: Sprint 15 Scaffold
+
+on:
+  push:
+    branches:
+      - feat/sprint-15-geospatial-import-zones
+
+permissions:
+  contents: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: agrocontrol
+          POSTGRES_PASSWORD: agrocontrol
+          POSTGRES_DB: agrocontrol_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agrocontrol -d agrocontrol_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=agrocontrol_test;Username=agrocontrol;Password=agrocontrol
+      AGROCONTROL_TEST_CONNECTION_STRING: Host=localhost;Port=5432;Database=agrocontrol_test;Username=agrocontrol;Password=agrocontrol
+      Jwt__Key: sprint15-temporary-jwt-key-with-at-least-32-characters
+      Telemetry__InternalApiKey: sprint15-temporary-telemetry-key-with-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: Validate current branch
+        run: |
+          dotnet restore AgroControl.sln
+          dotnet build AgroControl.sln --configuration Release --no-restore
+          dotnet test AgroControl.sln --configuration Release --no-build
+          cd src/frontend
+          npm ci
+          npm run typecheck
+          npm test -- --run
+          npm run build
