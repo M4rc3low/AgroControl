@@ -16,6 +16,7 @@ using AgroControl.Application.Sustainability;
 using AgroControl.Application.Telemetry;
 using AgroControl.Infrastructure.Intelligence;
 using AgroControl.Infrastructure.Persistence;
+using AgroControl.Infrastructure.RemoteSensing;
 using AgroControl.Infrastructure.Security;
 using AgroControl.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
@@ -69,6 +70,20 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(telemetryBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(telemetryTimeout);
         });
+
+        var stacTimeout = int.TryParse(configuration["RemoteSensing:Stac:TimeoutSeconds"], out var configuredStac)
+            ? Math.Clamp(configuredStac, 1, 60)
+            : 20;
+        services.AddHttpClient("stac-discovery", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(stacTimeout);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("AgroControl/0.19-stac-discovery");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        });
+        services.AddSingleton<IRemoteSceneDiscoveryClient, StacRemoteSceneDiscoveryClient>();
+
         return services;
     }
 
