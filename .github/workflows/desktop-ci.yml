@@ -36,6 +36,10 @@ jobs:
         working-directory: src/frontend
         run: npm ci --no-audit --no-fund
 
+      - name: Generate Tauri icons from canonical app icon
+        working-directory: src/frontend
+        run: npx --yes @tauri-apps/cli@2 icon public/icons/icon-512.png
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
