@@ -12,9 +12,9 @@ public sealed class MultiFarmIndirectFarmBackfill : Migration
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         // Sprint 18 makes FarmId the canonical operational-scope key whenever a
-        // record is already linked indirectly through Field or Season. Older rows
-        // may predate that invariant, so normalize them before horizontal scope is
-        // relied on for every module.
+        // record is already linked indirectly through Field, Season or ExportOrder.
+        // Older rows may predate that invariant, so normalize them before horizontal
+        // scope is relied on for every module.
         migrationBuilder.Sql("""
             UPDATE stock_movements AS target
             SET "FarmId" = field."FarmId"
@@ -70,16 +70,17 @@ public sealed class MultiFarmIndirectFarmBackfill : Migration
 
             UPDATE commercial_opportunities AS target
             SET "FarmId" = field."FarmId"
-            FROM fields AS field
-            WHERE target."FarmId" IS NULL
-              AND target."FieldId" = field."Id";
-
-            UPDATE commercial_opportunities AS target
-            SET "FarmId" = field."FarmId"
             FROM seasons AS season
             JOIN fields AS field ON field."Id" = season."FieldId"
             WHERE target."FarmId" IS NULL
               AND target."SeasonId" = season."Id";
+
+            UPDATE commercial_opportunities AS target
+            SET "FarmId" = export_order."FarmId"
+            FROM export_orders AS export_order
+            WHERE target."FarmId" IS NULL
+              AND target."ExportOrderId" = export_order."Id"
+              AND export_order."FarmId" IS NOT NULL;
             """);
     }
 
