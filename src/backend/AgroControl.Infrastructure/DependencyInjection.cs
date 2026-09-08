@@ -42,12 +42,13 @@ public static class DependencyInjection
         services.AddScoped<IMarketRepository, MarketRepository>();
         services.AddScoped<IPrecisionAgricultureRepository, PrecisionAgricultureRepository>();
         services.AddScoped<IRemoteSensingRepository, RemoteSensingRepository>();
+        services.AddScoped<IRasterProcessingRepository, RasterProcessingRepository>();
         services.AddScoped<IIntelligenceDataSource, IntelligenceDataSource>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
 
         var intelligenceBaseUrl = configuration["Intelligence:BaseUrl"] ?? "http://localhost:8090";
-        var intelligenceTimeout = int.TryParse(configuration["Intelligence:TimeoutSeconds"], out var configuredIntelligence) ? Math.Clamp(configuredIntelligence, 1, 60) : 5;
+        var intelligenceTimeout = int.TryParse(configuration["Intelligence:TimeoutSeconds"], out var configuredIntelligence) ? Math.Clamp(configuredIntelligence, 1, 300) : 30;
         services.AddHttpClient<IIntelligenceClient, IntelligenceHttpClient>(client =>
         {
             client.BaseAddress = new Uri(intelligenceBaseUrl);
