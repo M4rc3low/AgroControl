@@ -259,7 +259,7 @@
 - [x] testes Python com raster sintético e testes C# de domínio/persistência/contrato;
 - [x] documentação `SPRINT_17_RASTER_PROCESSING.md` e versão API `0.17.0`.
 
-## Sprint 18 — Operação multi-fazenda 🧪
+## Sprint 18 — Operação multi-fazenda ✅
 
 - [x] `Farm` como fronteira operacional abaixo de `Organization`;
 - [x] regiões operacionais e localização estruturada por propriedade;
@@ -275,8 +275,8 @@
 - [x] timezone IANA por propriedade e apresentação operacional SP × MT × AM × AC;
 - [x] migration `MultiFarmRegionalOperations` e hardening de backfill por UF;
 - [x] documentação `SPRINT_18_MULTI_FARM.md` e versão API `0.18.0`;
-- [ ] Backend CI, Frontend CI, Platform CI e CodeQL verdes no head final;
-- [ ] squash merge do PR da Sprint 18 e encerramento da Issue #50.
+- [x] Backend CI, Frontend CI, Platform CI e CodeQL verdes no head final;
+- [x] squash merge do PR da Sprint 18 e encerramento da Issue #50.
 
 ## Próximos aprimoramentos
 
