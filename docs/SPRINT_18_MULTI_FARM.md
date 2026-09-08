@@ -62,6 +62,8 @@ Registros genuinamente organizacionais sem vínculo com uma propriedade, quando 
 
 Além dos filtros, as operações de escrita normalizam e validam referências Farm/Field/Season no mesmo tenant. IDs de uma propriedade fora do escopo não devem ser usados para inferir existência de recursos de outra fazenda.
 
+Para registros legados, a migration `20260908194500_MultiFarmIndirectFarmBackfill` preenche `FarmId` quando a fazenda já pode ser inferida por `FieldId` ou `SeasonId` em Estoque, Financeiro, Sustentabilidade, Exportação e Comercial. Isso elimina a ambiguidade entre um registro realmente organizacional e um registro antigo que já pertencia a uma fazenda por referência indireta.
+
 ## SQL espacial e raster
 
 Agricultura de Precisão, Sensoriamento Remoto e Raster usam SQL/PostGIS explícito em trechos que não passam pelo LINQ do EF Core. Esses repositórios recebem o mesmo `IOperationalScopeContext` e adicionam a restrição de fazenda diretamente ao SQL.
@@ -146,6 +148,14 @@ O hardening de timezone acrescenta:
 
 Essa migration corrige os timezones operacionais de UFs brasileiras fora do horário de Brasília quando o registro legado ainda conserva o fallback `America/Sao_Paulo`. O `Down` não reverte dados para evitar sobrescrever correções explícitas feitas depois da migração.
 
+A normalização de vínculos indiretos acrescenta:
+
+```text
+20260908194500_MultiFarmIndirectFarmBackfill
+```
+
+Essa migration materializa `FarmId` a partir de Field/Season em registros legados dos módulos que aceitam vínculos opcionais. O `Down` também é intencionalmente irreversível, porque apagar o `FarmId` recuperado destruiria informação e poderia reabrir uma ambiguidade de autorização horizontal.
+
 ## Matriz de segurança horizontal
 
 A validação automatizada usa uma organização com duas propriedades, Fazenda A e Fazenda B, e um usuário cujo escopo efetivo contém somente A.
@@ -171,7 +181,8 @@ O desenho adota defesa em profundidade:
 4. repositórios SQL/PostGIS aplicam a restrição explicitamente;
 5. Telemetry valida o vínculo na API C# antes de acessar o serviço Java;
 6. IDs fora do escopo são tratados como não encontrados sempre que possível para reduzir enumeração;
-7. testes A × B na mesma organização verificam a autorização horizontal nos módulos vinculados a fazenda.
+7. dados legados com vínculo indireto recebem `FarmId` canônico antes de depender do novo escopo;
+8. testes A × B na mesma organização verificam a autorização horizontal nos módulos vinculados a fazenda.
 
 O seletor da Web jamais é tratado como mecanismo de autorização.
 
