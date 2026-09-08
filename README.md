@@ -2,7 +2,7 @@
 
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo operacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência, **Java / Spring Boot** para telemetria e uma aplicação web em **React + TypeScript**.
 
-> Status atual: **Sprint 11 concluída — Irrigação, umidade do solo e manejo hídrico**
+> Status atual: **Sprint 12 concluída — Sustentabilidade, emissões estimadas e indicadores de CO₂e**
 
 ## Objetivo
 
@@ -17,7 +17,8 @@ Centralizar os principais fluxos de uma operação rural em uma única plataform
 - análise de dados e previsão de produtividade;
 - sensores, GPS, estações e telemetria;
 - zonas de irrigação, umidade do solo e aplicações de água;
-- módulos futuros de sustentabilidade e exportação.
+- fatores de emissão, atividades e indicadores gerenciais de CO₂e;
+- evolução futura para exportação, sensoriamento remoto e análises agronômicas avançadas.
 
 Os módulos são liberados por plano e o bloqueio é validado no backend, não apenas na interface.
 
@@ -77,6 +78,7 @@ A aplicação web mantém o navegador no mesmo origin para `/api`; a API concent
 - CRUD web de propriedades, talhões, culturas e safras;
 - workspace de agricultura de precisão com mapa e limites de talhões;
 - painel de irrigação com zonas, condição hídrica, aplicações e volume estimado;
+- workspace de sustentabilidade com fatores de emissão, ledger de atividades, CO₂e e composição por categoria;
 - layout para desktop, tablet e mobile;
 - proxy reverso same-origin no Nginx.
 
@@ -124,6 +126,22 @@ O frontend melhora a experiência, mas **não substitui as validações de autor
 - correções por lançamento compensatório, preservando o histórico;
 - isolamento por organização e proteção pelo entitlement `Irrigation`;
 - nenhuma atuação automática em bombas, pivôs ou válvulas.
+
+### Sustentabilidade
+
+- fatores de emissão configuráveis por organização, categoria e unidade;
+- valor em `kgCO2e/unidade`, referência metodológica, vigência e status;
+- atividades de emissão em ledger append-only;
+- snapshot do fator utilizado para impedir que alterações futuras reescrevam o histórico;
+- cálculo determinístico de `kgCO2e` e `tCO2e`;
+- qualidade do dado distinguindo `Measured`, `Recorded` e `Estimated`;
+- vínculos opcionais com propriedade, talhão e safra;
+- integração desacoplada por `sourceModule + sourceReferenceId`, com idempotência por organização;
+- correções por lançamento compensatório;
+- resumo por período e categoria, comparação descritiva com período anterior, `tCO2e/ha` e `kgCO2e` por unidade produzida quando há produtividade realizada;
+- isolamento multi-tenant e proteção pelo entitlement `Sustainability`.
+
+Os indicadores de sustentabilidade são **estimativas gerenciais e apoio à decisão**. O AgroControl não certifica inventários, não executa auditoria ambiental e não emite, certifica ou comercializa créditos de carbono.
 
 ### Estoque
 
@@ -236,6 +254,7 @@ GET  /api/v1/platform/entitlements
 /api/v1/seasons
 /api/v1/precision/*
 /api/v1/irrigation/*
+/api/v1/sustainability/*
 /api/v1/inventory/*
 /api/v1/finance/*
 /api/v1/machinery/*
@@ -266,6 +285,7 @@ A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e 
 - [`docs/SPRINT_9_WEB.md`](docs/SPRINT_9_WEB.md)
 - [`docs/SPRINT_10_PRECISION_AGRICULTURE.md`](docs/SPRINT_10_PRECISION_AGRICULTURE.md)
 - [`docs/SPRINT_11_IRRIGATION.md`](docs/SPRINT_11_IRRIGATION.md)
+- [`docs/SPRINT_12_SUSTAINABILITY.md`](docs/SPRINT_12_SUSTAINABILITY.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## Roadmap resumido
@@ -282,6 +302,7 @@ A base fica em `k8s/` e pode ser renderizada com `kubectl kustomize k8s/base` e 
 10. ✅ **Sprint 9** — AgroControl Web, autenticação, dashboard e produção rural no navegador.
 11. ✅ **Sprint 10** — PostGIS, GeoJSON, talhões georreferenciados e mapas.
 12. ✅ **Sprint 11** — irrigação, umidade do solo, aplicações de água e manejo hídrico.
+13. ✅ **Sprint 12** — sustentabilidade, fatores de emissão, CO₂e e indicadores ambientais.
 
 O hardening que depende de ambiente real, política operacional ou testes de carga está separado no issue **#18**.
 

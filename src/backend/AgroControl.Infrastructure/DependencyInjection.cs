@@ -9,6 +9,7 @@ using AgroControl.Application.Market;
 using AgroControl.Application.PrecisionAgriculture;
 using AgroControl.Application.Production;
 using AgroControl.Application.Subscriptions;
+using AgroControl.Application.Sustainability;
 using AgroControl.Application.Telemetry;
 using AgroControl.Infrastructure.Intelligence;
 using AgroControl.Infrastructure.Persistence;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IProductionRepository, ProductionRepository>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddScoped<IIrrigationRepository, IrrigationRepository>();
+        services.AddScoped<ISustainabilityRepository, SustainabilityRepository>();
         services.AddScoped<IFinanceRepository, FinanceRepository>();
         services.AddScoped<IMachineryRepository, MachineryRepository>();
         services.AddScoped<IMarketRepository, MarketRepository>();

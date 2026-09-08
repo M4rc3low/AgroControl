@@ -1,0 +1,21 @@
+.sustainability-actions { display: flex; gap: .65rem; flex-wrap: wrap; }
+.sustainability-disclaimer { padding: .9rem 1rem; border: 1px solid var(--border); border-radius: .85rem; background: var(--surface-soft); color: var(--muted); }
+.sustainability-disclaimer strong { color: var(--text); }
+.sustainability-filters { display: flex; align-items: end; gap: .8rem; flex-wrap: wrap; }
+.sustainability-filters label { display: grid; gap: .35rem; min-width: 150px; color: var(--muted); font-size: .84rem; }
+.sustainability-filters input, .sustainability-filters select { min-height: 40px; }
+.sustainability-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.sustainability-metrics .card { display: grid; gap: .35rem; }
+.sustainability-metrics span, .sustainability-metrics small { color: var(--muted); }
+.sustainability-metrics strong { font-size: 1.55rem; }
+.sustainability-section { display: grid; gap: 1rem; }
+.emission-breakdown { display: grid; gap: 1rem; }
+.emission-breakdown__row { display: grid; grid-template-columns: minmax(180px, .9fr) minmax(180px, 2fr) auto; align-items: center; gap: 1rem; }
+.emission-breakdown__row > div:first-child { display: grid; gap: .2rem; }
+.emission-breakdown__row span { color: var(--muted); font-size: .85rem; }
+.emission-breakdown__track { height: 10px; border-radius: 999px; background: var(--surface-soft); overflow: hidden; }
+.emission-breakdown__track span { display: block; height: 100%; background: currentColor; border-radius: inherit; opacity: .55; }
+.table-subline { display: block; margin-top: .2rem; color: var(--muted); max-width: 420px; }
+.row-actions { display: flex; justify-content: flex-end; gap: .45rem; flex-wrap: wrap; }
+@media (max-width: 900px) { .sustainability-metrics { grid-template-columns: 1fr; } .emission-breakdown__row { grid-template-columns: 1fr auto; } .emission-breakdown__track { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .sustainability-filters { display: grid; grid-template-columns: 1fr; } .sustainability-filters label { min-width: 0; } .row-actions { justify-content: flex-start; } }

@@ -14,6 +14,7 @@ using AgroControl.Application.Platform;
 using AgroControl.Application.PrecisionAgriculture;
 using AgroControl.Application.Production;
 using AgroControl.Application.Subscriptions;
+using AgroControl.Application.Sustainability;
 using AgroControl.Domain.Platform;
 using AgroControl.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -44,6 +45,7 @@ builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<SeasonService>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<IrrigationService>();
+builder.Services.AddScoped<SustainabilityService>();
 builder.Services.AddScoped<FinanceService>();
 builder.Services.AddScoped<MachineryService>();
 builder.Services.AddScoped<MarketService>();
@@ -98,7 +100,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.11.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.12.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -157,6 +159,7 @@ app.MapIntelligenceEndpoints();
 app.MapTelemetryEndpoints();
 app.MapPrecisionAgricultureEndpoints();
 app.MapIrrigationEndpoints();
+app.MapSustainabilityEndpoints();
 app.Run();
 
 static bool TryGetOrganizationId(ClaimsPrincipal principal, out Guid organizationId) => Guid.TryParse(principal.FindFirstValue("org_id"), out organizationId);
