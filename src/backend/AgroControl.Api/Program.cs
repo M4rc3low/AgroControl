@@ -79,7 +79,8 @@ if (builder.Configuration.GetValue<bool>("Observability:Enabled"))
             .AddMeter(
                 "Microsoft.AspNetCore.Hosting",
                 "Microsoft.AspNetCore.Server.Kestrel",
-                "System.Net.Http")
+                "System.Net.Http",
+                RemoteSceneDiscoveryTelemetry.MeterName)
             .AddOtlpExporter());
 }
 
