@@ -12,26 +12,26 @@ public static class TelemetryEndpoints
         var group = endpoints.MapGroup("/api/v1/telemetry").RequireAuthorization();
         group.AddEndpointFilter(new ModuleAccessEndpointFilter(ModuleKey.Telemetry));
 
-        group.MapGet("/devices", async (ClaimsPrincipal user, ITelemetryClient client, int limit, CancellationToken ct) =>
-            await Execute(() => client.ListDevicesAsync(OrganizationId(user), limit == 0 ? 100 : limit, ct)));
+        group.MapGet("/devices", async (ClaimsPrincipal user, TelemetryAccessService service, int limit, CancellationToken ct) =>
+            await Execute(() => service.ListDevicesAsync(OrganizationId(user), limit == 0 ? 100 : limit, ct)));
 
-        group.MapPost("/devices", async (ClaimsPrincipal user, CreateTelemetryDeviceCommand command, ITelemetryClient client, CancellationToken ct) =>
-            await Execute(() => client.CreateDeviceAsync(OrganizationId(user), command, ct), created: true));
+        group.MapPost("/devices", async (ClaimsPrincipal user, CreateTelemetryDeviceCommand command, TelemetryAccessService service, CancellationToken ct) =>
+            await Execute(() => service.CreateDeviceAsync(OrganizationId(user), command, ct), created: true));
 
-        group.MapGet("/devices/{deviceId:guid}", async (Guid deviceId, ClaimsPrincipal user, ITelemetryClient client, CancellationToken ct) =>
-            await Execute(() => client.GetDeviceAsync(OrganizationId(user), deviceId, ct)));
+        group.MapGet("/devices/{deviceId:guid}", async (Guid deviceId, ClaimsPrincipal user, TelemetryAccessService service, CancellationToken ct) =>
+            await Execute(() => service.GetDeviceAsync(OrganizationId(user), deviceId, ct)));
 
-        group.MapPatch("/devices/{deviceId:guid}/status", async (Guid deviceId, ClaimsPrincipal user, UpdateTelemetryStatus command, ITelemetryClient client, CancellationToken ct) =>
-            await Execute(() => client.UpdateStatusAsync(OrganizationId(user), deviceId, command.Status, ct)));
+        group.MapPatch("/devices/{deviceId:guid}/status", async (Guid deviceId, ClaimsPrincipal user, UpdateTelemetryStatus command, TelemetryAccessService service, CancellationToken ct) =>
+            await Execute(() => service.UpdateStatusAsync(OrganizationId(user), deviceId, command.Status, ct)));
 
-        group.MapPost("/devices/{deviceId:guid}/events", async (Guid deviceId, ClaimsPrincipal user, CreateTelemetryEventCommand command, ITelemetryClient client, CancellationToken ct) =>
-            await Execute(() => client.IngestAsync(OrganizationId(user), deviceId, command, ct), created: true));
+        group.MapPost("/devices/{deviceId:guid}/events", async (Guid deviceId, ClaimsPrincipal user, CreateTelemetryEventCommand command, TelemetryAccessService service, CancellationToken ct) =>
+            await Execute(() => service.IngestAsync(OrganizationId(user), deviceId, command, ct), created: true));
 
-        group.MapGet("/devices/{deviceId:guid}/latest", async (Guid deviceId, ClaimsPrincipal user, ITelemetryClient client, string? metric, CancellationToken ct) =>
-            await Execute(() => client.GetLatestAsync(OrganizationId(user), deviceId, metric, ct)));
+        group.MapGet("/devices/{deviceId:guid}/latest", async (Guid deviceId, ClaimsPrincipal user, TelemetryAccessService service, string? metric, CancellationToken ct) =>
+            await Execute(() => service.GetLatestAsync(OrganizationId(user), deviceId, metric, ct)));
 
-        group.MapGet("/devices/{deviceId:guid}/events", async (Guid deviceId, ClaimsPrincipal user, ITelemetryClient client, string? metric, DateTimeOffset? from, DateTimeOffset? to, int limit, CancellationToken ct) =>
-            await Execute(() => client.GetHistoryAsync(OrganizationId(user), deviceId, metric, from, to, limit == 0 ? 100 : limit, ct)));
+        group.MapGet("/devices/{deviceId:guid}/events", async (Guid deviceId, ClaimsPrincipal user, TelemetryAccessService service, string? metric, DateTimeOffset? from, DateTimeOffset? to, int limit, CancellationToken ct) =>
+            await Execute(() => service.GetHistoryAsync(OrganizationId(user), deviceId, metric, from, to, limit == 0 ? 100 : limit, ct)));
 
         return endpoints;
     }

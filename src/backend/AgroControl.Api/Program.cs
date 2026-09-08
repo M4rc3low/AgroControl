@@ -18,6 +18,7 @@ using AgroControl.Application.Production;
 using AgroControl.Application.RegionalOperations;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Application.Sustainability;
+using AgroControl.Application.Telemetry;
 using AgroControl.Domain.Platform;
 using AgroControl.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -59,6 +60,7 @@ builder.Services.AddScoped<IntelligenceService>();
 builder.Services.AddScoped<PrecisionAgricultureService>();
 builder.Services.AddScoped<RemoteSensingService>();
 builder.Services.AddScoped<RasterProcessingService>();
+builder.Services.AddScoped<TelemetryAccessService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 if (builder.Configuration.GetValue<bool>("Observability:Enabled"))
