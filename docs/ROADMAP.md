@@ -139,6 +139,26 @@
 - [x] testes unitários e integração PostgreSQL;
 - [x] documentação da Sprint 11.
 
+## Sprint 12 — Sustentabilidade ✅
+
+- [x] fatores de emissão por organização, categoria e unidade;
+- [x] valor em `kgCO2e/unidade`, referência metodológica e vigência;
+- [x] atividades de emissão append-only;
+- [x] snapshot do fator utilizado no lançamento;
+- [x] cálculo determinístico de `kgCO2e` e `tCO2e`;
+- [x] qualidade de dado `Measured`, `Recorded` e `Estimated`;
+- [x] vínculos opcionais com Farm, Field e Season;
+- [x] referência externa desacoplada e idempotente por organização;
+- [x] correções por lançamento compensatório;
+- [x] resumo por período, categoria, propriedade e safra;
+- [x] comparação descritiva com período anterior;
+- [x] `tCO2e/ha` e `kgCO2e` por unidade produzida quando aplicável;
+- [x] API protegida pelo entitlement `Sustainability`;
+- [x] interface web responsiva com disclaimer de estimativa gerencial;
+- [x] migration `SustainabilityCore`, índices e unicidade da referência externa;
+- [x] testes unitários e integração PostgreSQL;
+- [x] documentação da Sprint 12.
+
 ## Próximos aprimoramentos
 
-O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para sustentabilidade e indicadores ambientais, importação de geometrias, imagens de satélite/drone, índices vegetativos, zonas de manejo e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.
+O hardening operacional que depende de políticas, ambiente real ou testes de carga continua no issue #18. As próximas evoluções funcionais podem avançar para exportação e logística comercial, importação de geometrias, imagens de satélite/drone, índices vegetativos, zonas de manejo e aprofundamento agronômico do balanço hídrico, mantendo cada responsabilidade em uma sprint separada.
