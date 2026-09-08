@@ -1,22 +1,23 @@
 using System.Data;
 using System.Data.Common;
 using AgroControl.Application.PrecisionAgriculture;
+using AgroControl.Application.RegionalOperations;
 using Microsoft.EntityFrameworkCore;
 
 namespace AgroControl.Infrastructure.Persistence;
 
-public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContext) : IPrecisionAgricultureRepository
+public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContext, IOperationalScopeContext? operationalScope = null) : IPrecisionAgricultureRepository
 {
     private const decimal BoundaryToleranceMeters = 0.5m;
 
     public Task<IReadOnlyList<SpatialFieldSnapshot>> ListFieldsAsync(Guid organizationId, Guid? farmId, bool includeInactive, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             SELECT f."Id", f."FarmId", f."Name", f."AreaHectares", f."IsActive",
                    CASE WHEN f."Boundary" IS NULL THEN NULL ELSE ST_AsGeoJSON(f."Boundary"::geometry, 8, 0) END,
                    CASE WHEN f."Boundary" IS NULL THEN NULL ELSE CAST(ST_Area(f."Boundary") / 10000.0 AS numeric(18,4)) END
             FROM fields AS f
-            WHERE f."OrganizationId" = @organizationId
+            WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")}
               AND (CAST(@farmId AS uuid) IS NULL OR f."FarmId" = CAST(@farmId AS uuid))
               AND (@includeInactive OR f."IsActive")
             ORDER BY f."Name", f."Id";
@@ -31,12 +32,12 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     public Task<SpatialFieldSnapshot?> GetFieldAsync(Guid organizationId, Guid fieldId, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             SELECT f."Id", f."FarmId", f."Name", f."AreaHectares", f."IsActive",
                    CASE WHEN f."Boundary" IS NULL THEN NULL ELSE ST_AsGeoJSON(f."Boundary"::geometry, 8, 0) END,
                    CASE WHEN f."Boundary" IS NULL THEN NULL ELSE CAST(ST_Area(f."Boundary") / 10000.0 AS numeric(18,4)) END
             FROM fields AS f
-            WHERE f."OrganizationId" = @organizationId AND f."Id" = @fieldId;
+            WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")} AND f."Id" = @fieldId;
             """;
         return QueryFieldSingleAsync(sql, command =>
         {
@@ -47,11 +48,11 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     public Task<SpatialFieldSnapshot?> UpsertBoundaryAsync(Guid organizationId, Guid fieldId, string geoJson, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             WITH candidate AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(@geoJson), 4326) AS geom), updated AS (
                 UPDATE fields AS f SET "Boundary" = candidate.geom::geography, "UpdatedAtUtc" = @updatedAtUtc
                 FROM candidate
-                WHERE f."OrganizationId" = @organizationId AND f."Id" = @fieldId
+                WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")} AND f."Id" = @fieldId
                   AND ST_GeometryType(candidate.geom) = 'ST_Polygon' AND NOT ST_IsEmpty(candidate.geom) AND ST_IsValid(candidate.geom)
                 RETURNING f."Id", f."FarmId", f."Name", f."AreaHectares", f."IsActive", f."Boundary")
             SELECT u."Id", u."FarmId", u."Name", u."AreaHectares", u."IsActive", ST_AsGeoJSON(u."Boundary"::geometry, 8, 0),
@@ -66,9 +67,9 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     public Task<SpatialFieldSnapshot?> ClearBoundaryAsync(Guid organizationId, Guid fieldId, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             UPDATE fields AS f SET "Boundary" = NULL, "UpdatedAtUtc" = @updatedAtUtc
-            WHERE f."OrganizationId" = @organizationId AND f."Id" = @fieldId
+            WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")} AND f."Id" = @fieldId
             RETURNING f."Id", f."FarmId", f."Name", f."AreaHectares", f."IsActive", NULL::text, NULL::numeric;
             """;
         return QueryFieldSingleAsync(sql, command =>
@@ -79,12 +80,12 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     public Task<IReadOnlyList<ManagementZoneSnapshot>> ListZonesAsync(Guid organizationId, Guid? fieldId, string? type, string? classification, bool includeInactive, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             SELECT z."Id", z."FieldId", z."Type", z."Name", z."Description", z."Classification", z."Value", z."Unit",
                    z."IsActive", z."CreatedAtUtc", z."UpdatedAtUtc", ST_AsGeoJSON(z."Geometry"::geometry, 8, 0),
                    CAST(ST_Area(z."Geometry") / 10000.0 AS numeric(18,4))
             FROM management_zones AS z
-            WHERE z."OrganizationId" = @organizationId
+            WHERE z."OrganizationId" = @organizationId{ZoneScopeSql("z")}
               AND (CAST(@fieldId AS uuid) IS NULL OR z."FieldId" = CAST(@fieldId AS uuid))
               AND (CAST(@type AS text) IS NULL OR z."Type" = CAST(@type AS text))
               AND (CAST(@classification AS text) IS NULL OR LOWER(COALESCE(z."Classification", '')) LIKE '%' || LOWER(CAST(@classification AS text)) || '%')
@@ -100,11 +101,11 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     public Task<ManagementZoneSnapshot?> GetZoneAsync(Guid organizationId, Guid zoneId, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             SELECT z."Id", z."FieldId", z."Type", z."Name", z."Description", z."Classification", z."Value", z."Unit",
                    z."IsActive", z."CreatedAtUtc", z."UpdatedAtUtc", ST_AsGeoJSON(z."Geometry"::geometry, 8, 0),
                    CAST(ST_Area(z."Geometry") / 10000.0 AS numeric(18,4))
-            FROM management_zones AS z WHERE z."OrganizationId" = @organizationId AND z."Id" = @zoneId;
+            FROM management_zones AS z WHERE z."OrganizationId" = @organizationId{ZoneScopeSql("z")} AND z."Id" = @zoneId;
             """;
         return QueryZoneSingleAsync(sql, command =>
         {
@@ -114,7 +115,7 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     public async Task<ZoneGeometryValidationSnapshot?> ValidateZoneGeometryAsync(Guid organizationId, Guid fieldId, string geoJson, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             WITH candidate AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(@geoJson), 4326) AS geom)
             SELECT f."IsActive",
                    (ST_GeometryType(candidate.geom) = 'ST_Polygon' AND NOT ST_IsEmpty(candidate.geom) AND ST_IsValid(candidate.geom)) AS geometry_valid,
@@ -125,7 +126,7 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
                    END AS within_boundary,
                    (f."Boundary" IS NOT NULL) AS has_boundary
             FROM fields AS f CROSS JOIN candidate
-            WHERE f."OrganizationId" = @organizationId AND f."Id" = @fieldId;
+            WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")} AND f."Id" = @fieldId;
             """;
         var connection = dbContext.Database.GetDbConnection();
         var shouldClose = connection.State != ConnectionState.Open;
@@ -179,11 +180,11 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     public Task<ManagementZoneSnapshot?> UpdateZoneAsync(Guid organizationId, ManagementZoneWriteModel model, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             WITH candidate AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(@geoJson), 4326) AS geom), eligible AS (
                 SELECT f."Id" AS field_id, candidate.geom
                 FROM fields AS f CROSS JOIN candidate
-                WHERE f."OrganizationId" = @organizationId AND f."Id" = @fieldId AND f."IsActive"
+                WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")} AND f."Id" = @fieldId AND f."IsActive"
                   AND ST_GeometryType(candidate.geom) = 'ST_Polygon' AND NOT ST_IsEmpty(candidate.geom) AND ST_IsValid(candidate.geom)
                   AND (f."Boundary" IS NULL OR ST_Covers(ST_Buffer(f."Boundary", @toleranceMeters)::geometry, candidate.geom))
             ), updated AS (
@@ -191,7 +192,7 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
                 SET "Type" = @type, "Name" = @name, "Description" = @description, "Classification" = @classification,
                     "Value" = @value, "Unit" = @unit, "Geometry" = eligible.geom::geography, "UpdatedAtUtc" = @updatedAtUtc
                 FROM eligible
-                WHERE z."OrganizationId" = @organizationId AND z."Id" = @id AND z."FieldId" = eligible.field_id AND z."IsActive"
+                WHERE z."OrganizationId" = @organizationId{ZoneScopeSql("z")} AND z."Id" = @id AND z."FieldId" = eligible.field_id AND z."IsActive"
                 RETURNING z.*)
             SELECT z."Id", z."FieldId", z."Type", z."Name", z."Description", z."Classification", z."Value", z."Unit",
                    z."IsActive", z."CreatedAtUtc", z."UpdatedAtUtc", ST_AsGeoJSON(z."Geometry"::geometry, 8, 0),
@@ -202,10 +203,10 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     public Task<ManagementZoneSnapshot?> DeactivateZoneAsync(Guid organizationId, Guid zoneId, DateTime updatedAtUtc, CancellationToken cancellationToken = default)
     {
-        const string sql = """
+        var sql = $"""
             WITH updated AS (
                 UPDATE management_zones AS z SET "IsActive" = FALSE, "UpdatedAtUtc" = @updatedAtUtc
-                WHERE z."OrganizationId" = @organizationId AND z."Id" = @zoneId RETURNING z.*)
+                WHERE z."OrganizationId" = @organizationId{ZoneScopeSql("z")} AND z."Id" = @zoneId RETURNING z.*)
             SELECT z."Id", z."FieldId", z."Type", z."Name", z."Description", z."Classification", z."Value", z."Unit",
                    z."IsActive", z."CreatedAtUtc", z."UpdatedAtUtc", ST_AsGeoJSON(z."Geometry"::geometry, 8, 0),
                    CAST(ST_Area(z."Geometry") / 10000.0 AS numeric(18,4)) FROM updated AS z;
@@ -218,11 +219,11 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
 
     private Task<ManagementZoneSnapshot?> InsertZoneAsync(Guid organizationId, ManagementZoneWriteModel model, DbTransaction? transaction, CancellationToken cancellationToken)
     {
-        const string sql = """
+        var sql = $"""
             WITH candidate AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(@geoJson), 4326) AS geom), eligible AS (
                 SELECT candidate.geom
                 FROM fields AS f CROSS JOIN candidate
-                WHERE f."OrganizationId" = @organizationId AND f."Id" = @fieldId AND f."IsActive"
+                WHERE f."OrganizationId" = @organizationId{FieldScopeSql("f")} AND f."Id" = @fieldId AND f."IsActive"
                   AND ST_GeometryType(candidate.geom) = 'ST_Polygon' AND NOT ST_IsEmpty(candidate.geom) AND ST_IsValid(candidate.geom)
                   AND (f."Boundary" IS NULL OR ST_Covers(ST_Buffer(f."Boundary", @toleranceMeters)::geometry, candidate.geom))
             ), inserted AS (
@@ -300,6 +301,22 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
     private static ManagementZoneSnapshot ReadZone(DbDataReader reader) => new(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3),
         reader.IsDBNull(4) ? null : reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetDecimal(6),
         reader.IsDBNull(7) ? null : reader.GetString(7), reader.GetBoolean(8), reader.GetDateTime(9), reader.GetDateTime(10), reader.GetString(11), reader.GetDecimal(12));
+
+    private string FieldScopeSql(string alias)
+    {
+        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;
+        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";
+        return $" AND {alias}.\"FarmId\" IN ({FarmIdSqlList()})";
+    }
+
+    private string ZoneScopeSql(string alias)
+    {
+        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;
+        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";
+        return $" AND EXISTS (SELECT 1 FROM fields AS scope_field WHERE scope_field.\"OrganizationId\" = @organizationId AND scope_field.\"Id\" = {alias}.\"FieldId\" AND scope_field.\"FarmId\" IN ({FarmIdSqlList()}))";
+    }
+
+    private string FarmIdSqlList() => string.Join(", ", operationalScope!.FarmIds.Select(id => $"'{id:D}'::uuid"));
 
     private static void AddParameter(DbCommand command, string name, object? value)
     {

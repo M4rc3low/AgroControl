@@ -1,12 +1,13 @@
 using System.Data;
 using System.Data.Common;
 using AgroControl.Application.PrecisionAgriculture;
+using AgroControl.Application.RegionalOperations;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace AgroControl.Infrastructure.Persistence;
 
-public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) : IRasterProcessingRepository
+public sealed class RasterProcessingRepository(AgroControlDbContext dbContext, IOperationalScopeContext? operationalScope = null) : IRasterProcessingRepository
 {
     private const string RunSelect = """
         SELECT r."Id", r."ProductId", r."SceneId", r."ProcessingKey", r."Status", r."IncludeManagementZones",
@@ -27,7 +28,7 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
 
     public Task<RasterProcessingRunSnapshot?> GetRunByKeyAsync(Guid organizationId, string processingKey,
         CancellationToken cancellationToken = default) => QueryRunSingleAsync(
-        RunSelect + " WHERE r.\"OrganizationId\" = @organizationId AND r.\"ProcessingKey\" = @processingKey;",
+        RunSelect + $" WHERE r.\"OrganizationId\" = @organizationId AND r.\"ProcessingKey\" = @processingKey{RunScopeSql("r")};",
         command => { AddParameter(command, "organizationId", organizationId); AddParameter(command, "processingKey", processingKey); },
         cancellationToken);
 
@@ -48,12 +49,12 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
                 await using (var command = connection.CreateCommand())
                 {
                     command.Transaction = transaction;
-                    command.CommandText = """
+                    command.CommandText = $"""
                         INSERT INTO raster_products
                             ("Id", "OrganizationId", "SceneId", "ProductType", "CustomProductName", "AssetReference", "Band", "CreatedAtUtc")
                         SELECT @id, @organizationId, @sceneId, @productType, @customProductName, @assetReference, @band, @createdAtUtc
                         FROM remote_sensing_scenes AS s
-                        WHERE s."OrganizationId" = @organizationId AND s."Id" = @sceneId AND s."IsActive";
+                        WHERE s."OrganizationId" = @organizationId AND s."Id" = @sceneId AND s."IsActive"{SceneScopeSql("s")};
                         """;
                     AddParameter(command, "id", product.Id); AddParameter(command, "organizationId", organizationId);
                     AddParameter(command, "sceneId", product.SceneId); AddParameter(command, "productType", product.ProductType);
@@ -105,9 +106,9 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
     public async Task<RasterProcessingRunSnapshot?> MarkProcessingAsync(Guid organizationId, Guid runId,
         DateTime startedAtUtc, CancellationToken cancellationToken = default)
     {
-        await ExecuteNonQueryAsync("""
-            UPDATE raster_processing_runs SET "Status" = 'Processing', "StartedAtUtc" = @startedAtUtc, "FailureMessage" = NULL
-            WHERE "OrganizationId" = @organizationId AND "Id" = @runId AND "Status" = 'Pending';
+        await ExecuteNonQueryAsync($"""
+            UPDATE raster_processing_runs AS r SET "Status" = 'Processing', "StartedAtUtc" = @startedAtUtc, "FailureMessage" = NULL
+            WHERE r."OrganizationId" = @organizationId AND r."Id" = @runId AND r."Status" = 'Pending'{RunScopeSql("r")};
             """, command => { AddParameter(command, "organizationId", organizationId); AddParameter(command, "runId", runId); AddParameter(command, "startedAtUtc", startedAtUtc); }, cancellationToken);
         return await GetRunAsync(organizationId, runId, cancellationToken);
     }
@@ -115,10 +116,10 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
     public async Task<RasterProcessingRunSnapshot?> MarkFailedAsync(Guid organizationId, Guid runId,
         string failureMessage, DateTime completedAtUtc, CancellationToken cancellationToken = default)
     {
-        await ExecuteNonQueryAsync("""
-            UPDATE raster_processing_runs
+        await ExecuteNonQueryAsync($"""
+            UPDATE raster_processing_runs AS r
             SET "Status" = 'Failed', "FailureMessage" = @failureMessage, "CompletedAtUtc" = @completedAtUtc
-            WHERE "OrganizationId" = @organizationId AND "Id" = @runId AND "Status" IN ('Pending', 'Processing');
+            WHERE r."OrganizationId" = @organizationId AND r."Id" = @runId AND r."Status" IN ('Pending', 'Processing'){RunScopeSql("r")};
             """, command => { AddParameter(command, "organizationId", organizationId); AddParameter(command, "runId", runId); AddParameter(command, "failureMessage", failureMessage); AddParameter(command, "completedAtUtc", completedAtUtc); }, cancellationToken);
         return await GetRunAsync(organizationId, runId, cancellationToken);
     }
@@ -139,9 +140,9 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
                 await using (var command = connection.CreateCommand())
                 {
                     command.Transaction = transaction;
-                    command.CommandText = """
-                        SELECT "ProductId" FROM raster_processing_runs
-                        WHERE "OrganizationId" = @organizationId AND "Id" = @runId AND "Status" = 'Processing'
+                    command.CommandText = $"""
+                        SELECT r."ProductId" FROM raster_processing_runs AS r
+                        WHERE r."OrganizationId" = @organizationId AND r."Id" = @runId AND r."Status" = 'Processing'{RunScopeSql("r")}
                         FOR UPDATE;
                         """;
                     AddParameter(command, "organizationId", organizationId); AddParameter(command, "runId", runId);
@@ -201,20 +202,20 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
 
     public Task<IReadOnlyList<RasterProcessingRunSnapshot>> ListRunsAsync(Guid organizationId, Guid sceneId,
         CancellationToken cancellationToken = default) => QueryRunsManyAsync(
-        RunSelect + " WHERE r.\"OrganizationId\" = @organizationId AND r.\"SceneId\" = @sceneId ORDER BY r.\"RequestedAtUtc\" DESC;",
+        RunSelect + $" WHERE r.\"OrganizationId\" = @organizationId AND r.\"SceneId\" = @sceneId{RunScopeSql("r")} ORDER BY r.\"RequestedAtUtc\" DESC;",
         command => { AddParameter(command, "organizationId", organizationId); AddParameter(command, "sceneId", sceneId); }, cancellationToken);
 
     public Task<IReadOnlyList<RasterZonalResultSnapshot>> ListResultsByRunAsync(Guid organizationId, Guid runId,
         CancellationToken cancellationToken = default) => QueryResultsManyAsync(
-        ResultSelect + " WHERE z.\"OrganizationId\" = @organizationId AND z.\"RunId\" = @runId ORDER BY z.\"ManagementZoneId\" NULLS FIRST, z.\"Id\";",
+        ResultSelect + $" WHERE z.\"OrganizationId\" = @organizationId AND z.\"RunId\" = @runId{ResultScopeSql("z")} ORDER BY z.\"ManagementZoneId\" NULLS FIRST, z.\"Id\";",
         command => { AddParameter(command, "organizationId", organizationId); AddParameter(command, "runId", runId); }, cancellationToken);
 
     public async Task<(IReadOnlyList<RasterZonalResultSnapshot> Items, int TotalCount)> ListResultsAsync(Guid organizationId,
         int skip, int take, Guid? fieldId, Guid? seasonId, Guid? managementZoneId, string? indexType, DateTime? fromUtc,
         DateTime? toUtc, CancellationToken cancellationToken = default)
     {
-        const string filter = """
-            WHERE z."OrganizationId" = @organizationId
+        var filter = $"""
+            WHERE z."OrganizationId" = @organizationId{ResultScopeSql("z")}
               AND (CAST(@fieldId AS uuid) IS NULL OR z."FieldId" = CAST(@fieldId AS uuid))
               AND (CAST(@seasonId AS uuid) IS NULL OR z."SeasonId" = CAST(@seasonId AS uuid))
               AND (CAST(@managementZoneId AS uuid) IS NULL OR z."ManagementZoneId" = CAST(@managementZoneId AS uuid))
@@ -235,7 +236,7 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
     }
 
     private Task<RasterProcessingRunSnapshot?> GetRunAsync(Guid organizationId, Guid runId, CancellationToken cancellationToken) =>
-        QueryRunSingleAsync(RunSelect + " WHERE r.\"OrganizationId\" = @organizationId AND r.\"Id\" = @runId;",
+        QueryRunSingleAsync(RunSelect + $" WHERE r.\"OrganizationId\" = @organizationId AND r.\"Id\" = @runId{RunScopeSql("r")};",
             command => { AddParameter(command, "organizationId", organizationId); AddParameter(command, "runId", runId); }, cancellationToken);
 
     private static async Task InsertObservationAsync(DbConnection connection, DbTransaction transaction, Guid organizationId,
@@ -365,6 +366,25 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
         reader.IsDBNull(9) ? null : reader.GetString(9), reader.GetDecimal(10), reader.GetDecimal(11), reader.GetDecimal(12),
         reader.GetDecimal(13), reader.GetDecimal(14), reader.GetDecimal(15), reader.GetInt64(16), reader.GetString(17),
         reader.GetDateTime(18), reader.GetDateTime(19));
+
+    private string SceneScopeSql(string alias) => FieldReferenceScopeSql($"{alias}.\"FieldId\"");
+    private string ResultScopeSql(string alias) => FieldReferenceScopeSql($"{alias}.\"FieldId\"");
+
+    private string RunScopeSql(string alias)
+    {
+        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;
+        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";
+        return $" AND EXISTS (SELECT 1 FROM remote_sensing_scenes AS scope_scene JOIN fields AS scope_field ON scope_field.\"Id\" = scope_scene.\"FieldId\" AND scope_field.\"OrganizationId\" = scope_scene.\"OrganizationId\" WHERE scope_scene.\"OrganizationId\" = @organizationId AND scope_scene.\"Id\" = {alias}.\"SceneId\" AND scope_field.\"FarmId\" IN ({FarmIdSqlList()}))";
+    }
+
+    private string FieldReferenceScopeSql(string fieldIdExpression)
+    {
+        if (operationalScope is not { IsInitialized: true, IsRestricted: true }) return string.Empty;
+        if (operationalScope.FarmIds.Count == 0) return " AND FALSE";
+        return $" AND EXISTS (SELECT 1 FROM fields AS scope_field WHERE scope_field.\"OrganizationId\" = @organizationId AND scope_field.\"Id\" = {fieldIdExpression} AND scope_field.\"FarmId\" IN ({FarmIdSqlList()}))";
+    }
+
+    private string FarmIdSqlList() => string.Join(", ", operationalScope!.FarmIds.Select(id => $"'{id:D}'::uuid"));
 
     private static void AddParameter(DbCommand command, string name, object? value)
     {
