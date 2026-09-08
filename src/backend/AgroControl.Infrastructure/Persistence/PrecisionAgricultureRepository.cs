@@ -15,7 +15,7 @@ public sealed class PrecisionAgricultureRepository(AgroControlDbContext dbContex
                    CASE WHEN f."Boundary" IS NULL THEN NULL ELSE CAST(ST_Area(f."Boundary") / 10000.0 AS numeric(18,4)) END
             FROM fields AS f
             WHERE f."OrganizationId" = @organizationId
-              AND (@farmId IS NULL OR f."FarmId" = @farmId)
+              AND (CAST(@farmId AS uuid) IS NULL OR f."FarmId" = CAST(@farmId AS uuid))
               AND (@includeInactive OR f."IsActive")
             ORDER BY f."Name", f."Id";
             """;
