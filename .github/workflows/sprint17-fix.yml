@@ -21,15 +21,13 @@ jobs:
           from pathlib import Path
           p = Path('src/backend/AgroControl.Infrastructure/Persistence/RasterProcessingRepository.cs')
           s = p.read_text()
-          old = '''                var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken)
-                    ?? throw;
-                return new RasterRunCreationResult(duplicate, false);'''
-          new = '''                var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken);
-                if (duplicate is null) throw;
-                return new RasterRunCreationResult(duplicate, false);'''
-          if old not in s:
-              raise SystemExit('expected repository marker not found')
-          p.write_text(s.replace(old, new, 1))
+          needle = '''                var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken)
+                    ?? throw;'''
+          replacement = '''                var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken);
+                if (duplicate is null) throw;'''
+          if needle not in s:
+              raise SystemExit('compile guard marker not found')
+          p.write_text(s.replace(needle, replacement, 1))
           PY
       - name: Commit fix
         run: |
