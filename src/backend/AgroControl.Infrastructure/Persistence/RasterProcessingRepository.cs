@@ -229,7 +229,7 @@ public sealed class RasterProcessingRepository(AgroControlDbContext dbContext) :
             AddParameter(command, "indexType", indexType); AddParameter(command, "fromUtc", fromUtc); AddParameter(command, "toUtc", toUtc);
         }
         var total = await ExecuteCountAsync("SELECT COUNT(*) FROM raster_zonal_results AS z " + filter + ";", Configure, cancellationToken);
-        var items = await QueryResultsManyAsync(ResultSelect + filter + " ORDER BY z.\"ObservedAtUtc\" DESC, z.\"CreatedAtUtc\" DESC LIMIT @take OFFSET @skip;",
+        var items = await QueryResultsManyAsync(ResultSelect + " " + filter + " ORDER BY z.\"ObservedAtUtc\" DESC, z.\"CreatedAtUtc\" DESC LIMIT @take OFFSET @skip;",
             command => { Configure(command); AddParameter(command, "take", take); AddParameter(command, "skip", skip); }, cancellationToken);
         return (items, total);
     }
