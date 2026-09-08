@@ -2,7 +2,7 @@
 
 ## 1. Visão geral
 
-O AgroControl adota um **monólito modular em C# / ASP.NET Core** como núcleo transacional, complementado por serviços especializados quando existe uma fronteira técnica clara:
+O AgroControl adota um **monólito modular em C# / ASP.NET Core** como núcleo transacional, complementado por serviços especializados somente quando existe uma fronteira técnica clara:
 
 - **AgroControl Web** — React + TypeScript;
 - **AgroControl API** — ASP.NET Core / .NET;
@@ -12,7 +12,8 @@ O AgroControl adota um **monólito modular em C# / ASP.NET Core** como núcleo t
 - **PostgreSQL Telemetry** — persistência dedicada da telemetria;
 - **MQTT / Mosquitto** — ingestão de eventos de dispositivos;
 - **OpenTelemetry + Prometheus + Tempo + Grafana** — observabilidade;
-- **Docker, GitHub Actions e Kubernetes/Kustomize** — execução e entrega.
+- **Docker, GitHub Actions e Kubernetes/Kustomize** — execução e entrega;
+- **STAC providers externos** — descoberta de cenas geoespaciais por catálogo configurado.
 
 O objetivo é manter fronteiras de domínio claras sem introduzir complexidade distribuída onde ela não é necessária.
 
@@ -26,6 +27,7 @@ flowchart TB
     API --> CORE[(PostgreSQL + PostGIS)]
     API --> INT[AgroControl Intelligence\nPython / FastAPI / Rasterio]
     API --> TEL[AgroControl Telemetry\nJava / Spring Boot]
+    API --> STAC[STAC Provider configurado]
 
     DEVICES[Sensores / GPS / Estações / Máquinas] --> MQTT[MQTT / Mosquitto]
     MQTT --> TEL
@@ -87,7 +89,7 @@ OrganizationId — limite máximo do tenant
               └── Farm
 ```
 
-`OrganizationId` continua impedindo qualquer cruzamento entre empresas/grupos. A Sprint 18 acrescenta `Farm` como fronteira horizontal dentro do mesmo tenant.
+`OrganizationId` impede cruzamento entre organizações. `FarmAccessScope` restringe a operação horizontal dentro do mesmo tenant.
 
 ```text
 Organization
@@ -99,22 +101,20 @@ Organization
 └── Farm C
 ```
 
-O papel organizacional (`Owner`, `Admin`, `Manager`, `Viewer`) e o escopo operacional são conceitos separados. `Owner/Admin` não recebem acesso global por inferência durante a leitura; `AllFarms` é um escopo explícito.
+O papel organizacional (`Owner`, `Admin`, `Manager`, `Viewer`) e o escopo operacional são conceitos separados. O backend resolve o escopo efetivo por request.
 
 ## 5. Autorização horizontal
 
-A API resolve o escopo efetivo do usuário e inicializa um `OperationalScopeContext` por request.
-
-A proteção é aplicada em profundidade:
+A API inicializa um `OperationalScopeContext` por request e aplica proteção em profundidade:
 
 1. `OrganizationId` restringe o tenant;
-2. `FarmAccessScope` restringe as propriedades permitidas;
-3. query filters do EF Core protegem entidades relacionais ligadas a fazenda;
+2. `FarmAccessScope` restringe propriedades permitidas;
+3. query filters do EF Core protegem entidades relacionais ligadas à fazenda;
 4. SQL/PostGIS explícito recebe e aplica o mesmo escopo;
 5. Telemetry valida Farm/Field/Machine na API C# antes de acessar o serviço Java;
-6. IDs fora do escopo são tratados como inexistentes quando possível para reduzir enumeração;
-7. migrations de backfill materializam `FarmId` em registros legados quando a fazenda pode ser inferida;
-8. testes A × B na mesma organização exercitam a fronteira horizontal.
+6. IDs fora do escopo são tratados como inexistentes quando possível;
+7. migrations/backfills materializam `FarmId` quando necessário;
+8. testes Fazenda A × Fazenda B exercitam a fronteira horizontal.
 
 O frontend nunca é considerado mecanismo de segurança.
 
@@ -133,11 +133,11 @@ O catálogo canônico de módulos por plano está em `PlanEntitlementCatalog`.
 
 ## 7. Persistência
 
-O banco principal usa PostgreSQL + PostGIS e mantém ownership lógico por módulo. O raster pesado não é armazenado no banco relacional principal; ficam nele metadados, referências, lifecycle e estatísticas derivadas.
+O banco principal usa PostgreSQL + PostGIS e mantém ownership lógico por módulo. Raster pesado não é armazenado no banco relacional principal; ficam metadados, referências, lifecycle e estatísticas derivadas.
 
 Telemetry possui PostgreSQL próprio porque o padrão de ingestão/eventos é diferente do núcleo transacional.
 
-Convenções importantes:
+Convenções:
 
 - IDs em `Guid`;
 - timestamps técnicos em UTC;
@@ -146,21 +146,69 @@ Convenções importantes:
 - geometrias WGS84/SRID 4326;
 - timezone operacional em identificador IANA.
 
-## 8. Geoespacial e raster
+## 8. Geoespacial, sensoriamento remoto e raster
 
-PostGIS é usado para limites de talhão, zonas de manejo, footprints e consultas espaciais. Trechos SQL que não passam por LINQ aplicam explicitamente `OrganizationId` e o escopo operacional.
+PostGIS é usado para limites de talhão, zonas de manejo, footprints e consultas espaciais. Trechos SQL fora de LINQ aplicam explicitamente `OrganizationId` e o escopo operacional.
 
 O processamento científico de GeoTIFF/COG ocorre no AgroControl Intelligence com Rasterio/NumPy. A API C# mantém autorização, contexto produtivo, idempotência e persistência dos resultados.
 
-## 9. Telemetria
+`RemoteSensingScene` permanece o modelo canônico persistido para cenas.
+
+## 9. Descoberta STAC
+
+A Sprint 19 adiciona uma camada externa de descoberta sem criar um novo domínio persistente.
+
+```text
+Web
+  ↓
+RemoteSceneDiscoveryEndpoints
+  ↓
+RemoteSceneDiscoveryService
+  ├── Field/Season + FarmAccessScope
+  ↓
+IRemoteSceneDiscoveryClient
+  ↓
+StacRemoteSceneDiscoveryClient
+  ↓
+Provider STAC configurado
+```
+
+Princípios arquiteturais:
+
+- o browser envia `FieldId`, filtros e escolha do item/asset, nunca a URL do catálogo;
+- a geometria enviada ao provider é carregada do boundary canônico do Field no backend;
+- providers são definidos por configuração server-side;
+- busca é transitória e não persiste todos os itens externos;
+- importação reconsulta o item pelo backend usando `Provider + Collection + ExternalId`;
+- o cliente só aceita `AssetKey` que tenha sido normalizado como raster elegível;
+- `Provider + ExternalId` reaproveita a idempotência de `RemoteSensingScene`;
+- importação e processamento raster permanecem passos separados.
+
+### Segurança de rede STAC
+
+- HTTPS fora de loopback/local controlado;
+- credenciais embutidas em URL são rejeitadas;
+- query strings são removidas das referências normalizadas de assets;
+- paginação só segue continuação same-origin/same-path;
+- limite de resposta e timeout;
+- nenhum download de asset durante descoberta;
+- falha do provider não compromete o restante de Remote Sensing.
+
+### Observabilidade STAC
+
+O meter `AgroControl.RemoteSceneDiscovery` mede buscas, latência, volume de resultados e importações.
+
+Labels são limitadas a provider configurado e outcome. IDs de item, URL, `farmId`, `userId` e tokens não entram como labels.
+
+## 10. Telemetria
 
 AgroControl Telemetry recebe eventos via MQTT QoS 1 e mantém histórico append-only/idempotente. A API C# funciona como fronteira de autorização para os endpoints expostos ao produto, incluindo o escopo por propriedade.
 
 Dispositivos podem ser vinculados a Farm, Field e Machine. Recursos explicitamente organizacionais sem esses vínculos permanecem no escopo do tenant.
 
-## 10. Web e contexto multi-fazenda
+## 11. Web e contexto multi-fazenda
 
-A Web mantém o contexto operacional da organização durante a sessão e oferece seleção por:
+A Web mantém o contexto operacional durante a sessão e oferece seleção por:
 
 - todas as fazendas, quando permitido;
 - região operacional;
@@ -169,9 +217,11 @@ A Web mantém o contexto operacional da organização durante a sessão e oferec
 
 O dashboard e o mapa multi-fazenda usam somente propriedades acessíveis. O mapa usa MapLibre e ajusta o enquadramento ao conjunto visível.
 
-Datas operacionais são apresentadas no timezone da fazenda quando existe uma única propriedade ativa; consolidações entre propriedades preservam o instante UTC e o contexto local.
+A descoberta STAC está integrada ao workspace de Sensoriamento Remoto, com filtros, resultados paginados, footprint no mapa e importação explícita.
 
-## 11. Segurança
+Datas operacionais são apresentadas no timezone da fazenda quando existe uma única propriedade ativa; consolidações preservam o instante UTC e o contexto local.
+
+## 12. Segurança
 
 Princípios atuais:
 
@@ -184,12 +234,11 @@ Princípios atuais:
 - logs sem segredos/dados sensíveis desnecessários;
 - least privilege;
 - CodeQL e Dependabot;
-- assets raster remotos desabilitados por padrão;
-- testes de autorização cross-tenant e horizontal.
+- assets raster remotos desabilitados por padrão no Intelligence;
+- STAC providers permitidos por configuração server-side;
+- testes cross-tenant e horizontais.
 
-## 12. Observabilidade e plataforma
-
-Observabilidade já faz parte da plataforma:
+## 13. Observabilidade e plataforma
 
 - OpenTelemetry nos serviços C#, Python e Java;
 - Prometheus para métricas;
@@ -200,9 +249,9 @@ Observabilidade já faz parte da plataforma:
 - Kubernetes + Kustomize;
 - Platform CI com smoke tests e observabilidade.
 
-## 13. CI/CD
+## 14. CI/CD
 
-Os principais gates do repositório são:
+Principais gates:
 
 - Backend CI;
 - Intelligence CI;
@@ -212,10 +261,10 @@ Os principais gates do repositório são:
 - CodeQL;
 - Dependabot.
 
-A Sprint 18 foi fechada somente após Backend, Frontend, Platform e CodeQL passarem no mesmo head do PR #51.
+Sprints que alteram simultaneamente backend/web/plataforma só são encerradas depois de **Backend CI + Frontend CI + Platform CI + CodeQL** verdes no mesmo head.
 
-## 14. Estado atual
+## 15. Estado atual
 
-A arquitetura está consolidada até a **Sprint 18 — Operação multi-fazenda**, com API `0.18.0`.
+A arquitetura está consolidada até a **Sprint 19 — STAC e descoberta de cenas**, com API `0.19.0`.
 
-A próxima evolução deve preservar as fronteiras já estabelecidas: tenant, escopo operacional, módulo/entitlement e responsabilidades específicas de C#, Python e Java.
+As próximas evoluções devem preservar as fronteiras já estabelecidas: tenant, escopo operacional, módulo/entitlement, confiança de integrações externas e responsabilidades específicas de C#, Python e Java.
