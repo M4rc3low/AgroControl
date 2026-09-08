@@ -13,4 +13,6 @@ export interface LowStockItem { itemId: string; sku: string; name: string; unit:
 export interface FinancialSummary { accruedRevenue: number; accruedExpense: number; accruedResult: number; accruedMarginPercent: number | null; cashRevenue: number; cashExpense: number; cashResult: number; pendingReceivables: number; pendingPayables: number; }
 export interface GeoJsonPolygon { type: 'Polygon'; coordinates: number[][][]; }
 export interface PrecisionField { fieldId: string; farmId: string; name: string; registeredAreaHectares: number; isActive: boolean; hasBoundary: boolean; boundary: GeoJsonPolygon | null; spatialAreaHectares: number | null; areaDifferenceHectares: number | null; areaDifferencePercent: number | null; }
+export interface ManagementZone { id: string; fieldId: string; type: 'Soil' | 'Yield' | 'Vegetation' | 'Prescription' | 'Custom' | string; name: string; description: string | null; classification: string | null; value: number | null; unit: string | null; geometry: GeoJsonPolygon; spatialAreaHectares: number; isActive: boolean; createdAtUtc: string; updatedAtUtc: string; }
+export interface ManagementZoneImportResult { importedCount: number; items: ManagementZone[]; }
 export interface ApiProblem { title?: string; detail?: string; message?: string; errors?: Record<string, string[]>; }
