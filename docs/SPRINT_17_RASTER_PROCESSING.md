@@ -63,7 +63,7 @@ Essa proteção reduz a superfície de SSRF no MVP. Uma evolução futura deve u
 
 ## Persistência e idempotência
 
-A migration `20260908154000_RasterProcessingCore` cria as estruturas de produtos raster, execuções e resultados zonais. A API preserva o isolamento por `OrganizationId`, valida o vínculo da cena/talhão/safra e mantém unicidade da chave de processamento para impedir trabalho duplicado.
+A migration `20260908154500_RasterProcessingCore` cria as estruturas de produtos raster, execuções e resultados zonais. A API preserva o isolamento por `OrganizationId`, valida o vínculo da cena/talhão/safra e mantém unicidade da chave de processamento para impedir trabalho duplicado.
 
 Uma repetição idempotente retorna a execução já registrada. Corridas concorrentes na criação são tratadas recuperando a execução vencedora após a restrição de unicidade do PostgreSQL.
 
