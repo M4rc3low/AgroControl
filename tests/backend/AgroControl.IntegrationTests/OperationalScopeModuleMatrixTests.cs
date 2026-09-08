@@ -162,7 +162,7 @@ public sealed class OperationalScopeModuleMatrixTests
 
         Assert.Equal([exportAId], await scopedDb.ExportOrders.AsNoTracking().Select(x => x.Id).ToListAsync());
         Assert.Null(await scopedDb.ExportOrders.AsNoTracking().SingleOrDefaultAsync(x => x.Id == exportBId));
-        Assert.DoesNotContain(await scopedDb.ExportDocuments.AsNoTracking().ToListAsync(), x => x.ExportOrderId == exportBId);
+        Assert.DoesNotContain(await scopedDb.ExportDocuments.AsNoTracking().ToListAsync(), x => x.OrderId == exportBId);
 
         Assert.Equal([opportunityAId], await scopedDb.CommercialOpportunities.AsNoTracking().Select(x => x.Id).ToListAsync());
         Assert.Null(await scopedDb.CommercialOpportunities.AsNoTracking().SingleOrDefaultAsync(x => x.Id == opportunityBId));
