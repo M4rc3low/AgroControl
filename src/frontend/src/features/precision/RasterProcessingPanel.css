@@ -1,0 +1,23 @@
+.raster-panel { display: grid; gap: 1rem; }
+.raster-panel__header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.raster-panel__header h2 { margin: .2rem 0 .35rem; }
+.raster-panel__header p, .raster-panel__note { margin: 0; color: var(--muted); }
+.raster-panel__actions { display: flex; gap: .55rem; flex-wrap: wrap; }
+.raster-run-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; }
+.raster-run-grid > div { padding: .8rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface-soft); display: grid; gap: .35rem; }
+.raster-run-grid span { color: var(--muted); font-size: .8rem; }
+.raster-results { overflow-x: auto; border: 1px solid var(--border); border-radius: .75rem; }
+.raster-results__head, .raster-results__row { min-width: 690px; display: grid; grid-template-columns: minmax(150px, 1.4fr) repeat(4, minmax(100px, 1fr)); gap: .75rem; padding: .7rem .85rem; align-items: center; }
+.raster-results__head { background: var(--surface-soft); color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; }
+.raster-results__row + .raster-results__row { border-top: 1px solid var(--border); }
+.raster-history { border-top: 1px solid var(--border); padding-top: .8rem; }
+.raster-history summary { cursor: pointer; font-weight: 600; }
+.raster-history > div { display: grid; grid-template-columns: auto 1fr auto; gap: .65rem; align-items: center; padding: .6rem 0; }
+.raster-history small { color: var(--muted); }
+.raster-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+.raster-form label { display: grid; gap: .35rem; }
+.raster-form__wide, .raster-check, .raster-form__actions { grid-column: 1 / -1; }
+.raster-check { display: flex !important; grid-template-columns: auto 1fr; align-items: center; }
+.raster-form__actions { display: flex; justify-content: flex-end; gap: .55rem; }
+@media (max-width: 900px) { .raster-run-grid { grid-template-columns: repeat(2, 1fr); } .raster-panel__header { flex-direction: column; } }
+@media (max-width: 620px) { .raster-run-grid, .raster-form { grid-template-columns: 1fr; } .raster-form__wide, .raster-check, .raster-form__actions { grid-column: auto; } .raster-history > div { grid-template-columns: 1fr; } }
