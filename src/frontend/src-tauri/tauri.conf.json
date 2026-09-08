@@ -21,17 +21,18 @@
         "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
-        "devtools": false
+        "devtools": false,
+        "useHttpsScheme": false
       }
     ],
     "security": {
       "capabilities": [],
       "csp": {
         "default-src": "'self'",
-        "connect-src": ["'self'", "http://localhost:8080", "https:"],
+        "connect-src": ["'self'", "http://localhost:8080"],
         "img-src": ["'self'", "data:", "blob:", "https:"],
-        "style-src": ["'self'", "'unsafe-inline'"],
-        "script-src": "'self'",
+        "style-src": ["'self'", "'unsafe-inline'", "https://unpkg.com"],
+        "script-src": ["'self'", "https://unpkg.com"],
         "font-src": ["'self'", "data:"]
       }
     }
