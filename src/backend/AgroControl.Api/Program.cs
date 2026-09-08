@@ -59,6 +59,7 @@ builder.Services.AddScoped<MarketService>();
 builder.Services.AddScoped<IntelligenceService>();
 builder.Services.AddScoped<PrecisionAgricultureService>();
 builder.Services.AddScoped<RemoteSensingService>();
+builder.Services.AddScoped<RemoteSceneDiscoveryService>();
 builder.Services.AddScoped<RasterProcessingService>();
 builder.Services.AddScoped<TelemetryAccessService>();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -78,7 +79,8 @@ if (builder.Configuration.GetValue<bool>("Observability:Enabled"))
             .AddMeter(
                 "Microsoft.AspNetCore.Hosting",
                 "Microsoft.AspNetCore.Server.Kestrel",
-                "System.Net.Http")
+                "System.Net.Http",
+                RemoteSceneDiscoveryTelemetry.MeterName)
             .AddOtlpExporter());
 }
 
@@ -124,7 +126,7 @@ app.Use(async (httpContext, next) =>
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.18.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.19.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -184,6 +186,7 @@ app.MapIntelligenceEndpoints();
 app.MapTelemetryEndpoints();
 app.MapPrecisionAgricultureEndpoints();
 app.MapRemoteSensingEndpoints();
+app.MapRemoteSceneDiscoveryEndpoints();
 app.MapIrrigationEndpoints();
 app.MapSustainabilityEndpoints();
 app.MapExportEndpoints();

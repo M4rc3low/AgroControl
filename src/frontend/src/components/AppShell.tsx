@@ -12,6 +12,7 @@ const navigation = [
   { to: '/production', label: 'Produção rural', icon: 'leaf' as const, module: 'Farms' },
   { to: '/precision', label: 'Agricultura de precisão', icon: 'map' as const, module: 'PrecisionAgriculture' },
   { to: '/precision/remote-sensing', label: 'Sensoriamento remoto', icon: 'spark' as const, module: 'PrecisionAgriculture' },
+  { to: '/precision/remote-sensing/discovery', label: 'Descobrir cenas', icon: 'search' as const, module: 'PrecisionAgriculture' },
   { to: '/irrigation', label: 'Irrigação', icon: 'droplet' as const, module: 'Irrigation' },
   { to: '/sustainability', label: 'Sustentabilidade', icon: 'leaf' as const, module: 'Sustainability' },
   { to: '/export', label: 'Exportação', icon: 'box' as const, module: 'Export' },
@@ -61,7 +62,7 @@ export function AppShell() {
           <span className="nav__section">Operação</span>
           {navigation.map(item => {
             const allowed = !item.module || Boolean(platform?.entitlements.modules[item.module]);
-            return <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/precision'} onClick={closeSidebar} className={({ isActive }) => `nav__link ${isActive ? 'nav__link--active' : ''} ${allowed ? '' : 'nav__link--locked'}`.trim()}><Icon name={item.icon} size={19} /><span>{item.label}</span>{!allowed && <Icon name="lock" size={14} className="nav__lock" />}</NavLink>;
+            return <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/precision' || item.to === '/precision/remote-sensing'} onClick={closeSidebar} className={({ isActive }) => `nav__link ${isActive ? 'nav__link--active' : ''} ${allowed ? '' : 'nav__link--locked'}`.trim()}><Icon name={item.icon} size={19} /><span>{item.label}</span>{!allowed && <Icon name="lock" size={14} className="nav__lock" />}</NavLink>;
           })}
         </nav>
         <div className="sidebar__footer"><div className="plan-chip"><span>Plano atual</span><strong>{platform?.entitlements.plan ?? '—'}</strong></div><button className="nav__link nav__link--button" onClick={logout}><Icon name="logout" size={19} /><span>Sair</span></button></div>

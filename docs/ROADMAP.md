@@ -191,23 +191,49 @@ Este roadmap registra o estado funcional consolidado do projeto. Detalhes técni
 - [x] PR #51 mesclado por squash;
 - [x] Issue #50 encerrada como `completed`.
 
+## Sprint 19 — STAC e descoberta de cenas ✅
+
+- [x] camada de descoberta externa desacoplada de `RemoteSensingScene`;
+- [x] provider STAC configurado no backend;
+- [x] `IRemoteSceneDiscoveryClient` e cliente HTTP STAC;
+- [x] busca por boundary canônico do Field;
+- [x] filtros de período, coleção, provider e nuvens;
+- [x] paginação protegida por same-origin/same-path;
+- [x] normalização de cloud cover, GSD, platform/constellation e assets;
+- [x] proteção de URLs e remoção de query strings de assets;
+- [x] importação explícita com reconsulta server-side do item;
+- [x] seleção por `AssetKey`, sem confiar em `href` enviado pelo navegador;
+- [x] idempotência por `Provider + ExternalId` reaproveitando `RemoteSensingScene`;
+- [x] proteção `OrganizationId + FarmAccessScope`;
+- [x] teste Fazenda A × Fazenda B na mesma organização;
+- [x] rota web `/precision/remote-sensing/discovery`;
+- [x] mapa talhão × footprint da cena;
+- [x] filtros, paginação, estados de erro/vazio/loading e importação na Web;
+- [x] métricas STAC sem labels de alta cardinalidade;
+- [x] testes backend/frontend e documentação;
+- [x] API `0.19.0`;
+- [ ] Backend CI, Frontend CI, Platform CI e CodeQL verdes no mesmo head final;
+- [ ] PR #56 mesclado por squash;
+- [ ] Issue #53 encerrada como `completed`.
+
 ## Estado atual
 
-Todas as Sprints 0–18 acima estão **concluídas**.
+As Sprints 0–18 estão concluídas e mescladas. A Sprint 19 está funcionalmente concluída e em gate final de CI/merge.
 
-A base atual suporta uma organização com múltiplas propriedades em diferentes regiões, UFs e fusos horários sem criar tenants separados, preservando autorização horizontal e contexto operacional.
+A base atual suporta uma organização com múltiplas propriedades em diferentes regiões, UFs e fusos horários sem criar tenants separados, preserva autorização horizontal e agora também descobre/importa cenas geoespaciais por STAC sem transformar o backend em proxy HTTP aberto.
 
 ## Próximas evoluções candidatas
 
-As próximas sprints devem ser definidas separadamente, sem reabrir o escopo da Sprint 18. Candidatos já identificados:
+As próximas sprints devem ser definidas separadamente, sem reabrir o escopo da Sprint 19. Candidatos:
 
-- catálogo STAC e descoberta de cenas;
-- ingestão assíncrona de assets;
+- ingestão assíncrona/cache de assets grandes;
 - máscaras de qualidade/nuvem;
 - geração de produtos a partir de bandas brutas;
+- mosaico de cenas;
 - importação KML/Shapefile;
 - aprofundamento agronômico;
 - sincronização offline;
+- distribuição Web, PWA ou desktop instalável;
 - integrações oficiais CAR/SIGEF/IBGE;
 - hardening de produção dependente de política/infraestrutura real.
 
