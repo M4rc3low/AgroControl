@@ -9,30 +9,43 @@ permissions:
   contents: write
 
 jobs:
-  fix:
+  wire:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feat/sprint-17-raster-processing
-      - name: Fix repository compile guard
+      - name: Wire raster panel and harden nodata metadata
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
-          p = Path('src/backend/AgroControl.Infrastructure/Persistence/RasterProcessingRepository.cs')
-          s = p.read_text()
-          pattern = r'var duplicate = await GetRunByKeyAsync\(organizationId, run\.ProcessingKey, cancellationToken\)\s*\?\? throw;'
-          replacement = 'var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken);\n                if (duplicate is null) throw;'
-          updated, count = re.subn(pattern, replacement, s, count=1)
-          if count != 1:
-              raise SystemExit(f'compile guard replacement count={count}')
-          p.write_text(updated)
+
+          page = Path('src/frontend/src/pages/RemoteSensingPage.tsx')
+          s = page.read_text()
+          import_marker = "import { buildSeriesPath, formatIndexValue, groupRemoteSensingSeries } from '../features/precision/remoteSensing';\n"
+          import_line = import_marker + "import { RasterProcessingPanel } from '../features/precision/RasterProcessingPanel';\n"
+          if 'RasterProcessingPanel' not in s:
+              if import_marker not in s: raise SystemExit('remote sensing import marker missing')
+              s = s.replace(import_marker, import_line, 1)
+          error_marker = '    {error && <div className="context-error"><span>{error}</span></div>}\n\n'
+          panel_line = error_marker + '    <RasterProcessingPanel scene={selectedScene} zones={zones} onProcessed={loadRemote} />\n\n'
+          if '<RasterProcessingPanel scene=' not in s:
+              if error_marker not in s: raise SystemExit('remote sensing render marker missing')
+              s = s.replace(error_marker, panel_line, 1)
+          page.write_text(s)
+
+          raster = Path('src/intelligence/agrocontrol_intelligence/raster.py')
+          r = raster.read_text()
+          old = '                nodata=None if dataset.nodata is None else float(dataset.nodata),\n'
+          new = '                nodata=None if dataset.nodata is None or not np.isfinite(dataset.nodata) else float(dataset.nodata),\n'
+          if old in r:
+              r = r.replace(old, new, 1)
+          raster.write_text(r)
           PY
-      - name: Commit fix
+      - name: Commit integration
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/backend/AgroControl.Infrastructure/Persistence/RasterProcessingRepository.cs
-          git commit -m "fix(raster): handle idempotency race without invalid throw expression"
+          git add src/frontend/src/pages/RemoteSensingPage.tsx src/intelligence/agrocontrol_intelligence/raster.py
+          git commit -m "feat(web): integrate raster processing into remote sensing"
           git push origin HEAD:feat/sprint-17-raster-processing
