@@ -106,8 +106,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
 });
 builder.Services.AddAuthorization();
 
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ConfiguredOrigins", policy =>
+    {
+        if (allowedOrigins.Length > 0)
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 app.UseExceptionHandler();
+app.UseCors("ConfiguredOrigins");
 app.UseAuthentication();
 app.Use(async (httpContext, next) =>
 {
