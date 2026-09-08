@@ -2,9 +2,16 @@
 
 ## 1. Visão geral
 
-O AgroControl adota um **monólito modular em C# / ASP.NET Core** como núcleo transacional, complementado por serviços especializados somente quando existe uma fronteira técnica clara:
+O AgroControl adota um **monólito modular em C# / ASP.NET Core** como núcleo transacional, complementado por serviços especializados somente quando existe uma fronteira técnica clara.
 
-- **AgroControl Web** — React + TypeScript;
+A interface canônica é uma única aplicação **React + TypeScript + Vite**, distribuída em três superfícies sem duplicação de produto:
+
+- navegador;
+- PWA instalável;
+- Desktop Windows via Tauri.
+
+Serviços da plataforma:
+
 - **AgroControl API** — ASP.NET Core / .NET;
 - **AgroControl Intelligence** — Python + FastAPI para modelagem e processamento científico;
 - **AgroControl Telemetry** — Java + Spring Boot para ingestão e histórico de telemetria;
@@ -21,9 +28,15 @@ O objetivo é manter fronteiras de domínio claras sem introduzir complexidade d
 
 ```mermaid
 flowchart TB
-    USER[Usuário] --> WEB[AgroControl Web\nReact + TypeScript + Nginx]
-    WEB --> API[AgroControl API\nASP.NET Core]
+    USER[Usuário] --> BROWSER[Navegador]
+    USER --> PWA[PWA instalada]
+    USER --> DESKTOP[AgroControl Desktop\nTauri + WebView2]
 
+    BROWSER --> WEB[AgroControl React]
+    PWA --> WEB
+    DESKTOP --> WEB
+
+    WEB --> API[AgroControl API\nASP.NET Core]
     API --> CORE[(PostgreSQL + PostGIS)]
     API --> INT[AgroControl Intelligence\nPython / FastAPI / Rasterio]
     API --> TEL[AgroControl Telemetry\nJava / Spring Boot]
@@ -41,6 +54,8 @@ flowchart TB
     PROM --> GRAFANA[Grafana]
     TEMPO --> GRAFANA
 ```
+
+No deployment Web, Nginx serve o build React e funciona como proxy same-origin para a API. No Desktop, o mesmo build React roda dentro do WebView do Tauri e acessa a API por uma origem configurada, sujeita a CORS explícito.
 
 ## 3. Backend C#
 
@@ -116,7 +131,7 @@ A API inicializa um `OperationalScopeContext` por request e aplica proteção em
 7. migrations/backfills materializam `FarmId` quando necessário;
 8. testes Fazenda A × Fazenda B exercitam a fronteira horizontal.
 
-O frontend nunca é considerado mecanismo de segurança.
+Navegador, PWA e Tauri são clientes. Nenhum deles é considerado mecanismo de autorização.
 
 ## 6. Módulos e entitlements
 
@@ -146,6 +161,8 @@ Convenções:
 - geometrias WGS84/SRID 4326;
 - timezone operacional em identificador IANA.
 
+O Desktop da Sprint 20 não adiciona banco local. Sincronização offline futura deverá possuir desenho próprio de armazenamento, fila, versão e resolução de conflitos.
+
 ## 8. Geoespacial, sensoriamento remoto e raster
 
 PostGIS é usado para limites de talhão, zonas de manejo, footprints e consultas espaciais. Trechos SQL fora de LINQ aplicam explicitamente `OrganizationId` e o escopo operacional.
@@ -159,7 +176,7 @@ O processamento científico de GeoTIFF/COG ocorre no AgroControl Intelligence co
 A Sprint 19 adiciona uma camada externa de descoberta sem criar um novo domínio persistente.
 
 ```text
-Web
+Web / PWA / Desktop
   ↓
 RemoteSceneDiscoveryEndpoints
   ↓
@@ -175,7 +192,7 @@ Provider STAC configurado
 
 Princípios arquiteturais:
 
-- o browser envia `FieldId`, filtros e escolha do item/asset, nunca a URL do catálogo;
+- o cliente envia `FieldId`, filtros e escolha do item/asset, nunca a URL do catálogo;
 - a geometria enviada ao provider é carregada do boundary canônico do Field no backend;
 - providers são definidos por configuração server-side;
 - busca é transitória e não persiste todos os itens externos;
@@ -206,9 +223,9 @@ AgroControl Telemetry recebe eventos via MQTT QoS 1 e mantém histórico append-
 
 Dispositivos podem ser vinculados a Farm, Field e Machine. Recursos explicitamente organizacionais sem esses vínculos permanecem no escopo do tenant.
 
-## 11. Web e contexto multi-fazenda
+## 11. Web, PWA e contexto multi-fazenda
 
-A Web mantém o contexto operacional durante a sessão e oferece seleção por:
+A SPA React mantém o contexto operacional durante a sessão e oferece seleção por:
 
 - todas as fazendas, quando permitido;
 - região operacional;
@@ -221,7 +238,37 @@ A descoberta STAC está integrada ao workspace de Sensoriamento Remoto, com filt
 
 Datas operacionais são apresentadas no timezone da fazenda quando existe uma única propriedade ativa; consolidações preservam o instante UTC e o contexto local.
 
-## 12. Segurança
+A PWA adiciona apenas instalação e cache do app shell. O service worker exclui `/api` e `/health`, portanto dados autenticados de negócio não são transformados em cache offline nesta fase.
+
+## 12. Desktop Tauri
+
+A Sprint 20 introduz um shell Tauri v2 para Windows, mantendo a aplicação React como única interface.
+
+```text
+Tauri / WebView2
+      │
+      └── dist/ React/Vite
+              │
+              └── HTTPS → AgroControl API
+```
+
+Princípios:
+
+- nenhum backend C#, PostgreSQL, Python ou Java é empacotado no instalador;
+- nenhum comando Rust privilegiado é exposto ao JavaScript na fase inicial;
+- `withGlobalTauri=false`;
+- capabilities começam vazias;
+- DevTools ficam desabilitadas na distribuição;
+- CSP declara hosts permitidos;
+- `VITE_API_BASE_URL` define a API para o build desktop;
+- a origem Windows `http://tauri.localhost` é permitida na API por CORS explícito;
+- não há `AllowAnyOrigin`;
+- JWT continua em `sessionStorage`, sem persistência nativa nova;
+- o service worker PWA não é registrado dentro do Tauri.
+
+O Desktop CI gera bundles NSIS `.exe` e MSI `.msi`. Enquanto não houver certificado de code signing, esses artefatos são classificados como builds de validação não assinados, não como distribuição pública oficial.
+
+## 13. Segurança
 
 Princípios atuais:
 
@@ -236,9 +283,11 @@ Princípios atuais:
 - CodeQL e Dependabot;
 - assets raster remotos desabilitados por padrão no Intelligence;
 - STAC providers permitidos por configuração server-side;
+- CORS por allowlist para clientes cross-origin permitidos;
+- CSP explícita no shell Tauri;
 - testes cross-tenant e horizontais.
 
-## 13. Observabilidade e plataforma
+## 14. Observabilidade e plataforma
 
 - OpenTelemetry nos serviços C#, Python e Java;
 - Prometheus para métricas;
@@ -249,7 +298,7 @@ Princípios atuais:
 - Kubernetes + Kustomize;
 - Platform CI com smoke tests e observabilidade.
 
-## 14. CI/CD
+## 15. CI/CD
 
 Principais gates:
 
@@ -257,14 +306,17 @@ Principais gates:
 - Intelligence CI;
 - Telemetry CI;
 - Frontend CI;
+- Desktop CI Windows;
 - Platform CI;
 - CodeQL;
 - Dependabot.
 
-Sprints que alteram simultaneamente backend/web/plataforma só são encerradas depois de **Backend CI + Frontend CI + Platform CI + CodeQL** verdes no mesmo head.
+A partir da Sprint 20, mudanças na distribuição instalável só são encerradas depois de **Frontend CI + Desktop CI + Backend CI + Platform CI + CodeQL** verdes no mesmo head final.
 
-## 15. Estado atual
+O Desktop CI usa runner Windows e constrói os bundles Tauri da mesma SPA usada pela Web. Assinatura de código e atualização automática permanecem bloqueadas até existir estratégia de distribuição de produção e certificado real.
 
-A arquitetura está consolidada até a **Sprint 19 — STAC e descoberta de cenas**, com API `0.19.0`.
+## 16. Estado atual
 
-As próximas evoluções devem preservar as fronteiras já estabelecidas: tenant, escopo operacional, módulo/entitlement, confiança de integrações externas e responsabilidades específicas de C#, Python e Java.
+A arquitetura funcional está consolidada até a **Sprint 19 — STAC e descoberta de cenas**, com API `0.19.0`. A Sprint 20 adiciona as superfícies instaláveis PWA/Tauri sem alterar as fronteiras do backend.
+
+As próximas evoluções devem preservar: tenant, escopo operacional, módulo/entitlement, confiança de integrações externas, separação cliente/servidor e responsabilidades específicas de C#, Python e Java.
