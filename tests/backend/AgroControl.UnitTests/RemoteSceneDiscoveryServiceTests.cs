@@ -89,7 +89,8 @@ public sealed class RemoteSceneDiscoveryServiceTests
     {
         var organizationId = Guid.NewGuid();
         var farmId = Guid.NewGuid();
-        var fieldId = Guid.NewGuid();
+        var productionField = Field.Create(organizationId, farmId, "Talhão STAC", 80m, DateTime.UtcNow);
+        var fieldId = productionField.Id;
         var precision = new FakePrecisionRepository
         {
             Field = includeScopedField
@@ -98,9 +99,7 @@ public sealed class RemoteSceneDiscoveryServiceTests
         };
         var production = new FakeProductionRepository
         {
-            Field = includeScopedField
-                ? Field.Create(organizationId, farmId, "Talhão STAC", 80m, DateTime.UtcNow)
-                : null
+            Field = includeScopedField ? productionField : null
         };
         var remoteRepository = new FakeRemoteSensingRepository();
         var remoteSensing = new RemoteSensingService(remoteRepository, production, precision);
