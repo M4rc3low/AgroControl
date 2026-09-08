@@ -1,0 +1,40 @@
+name: Sprint 17 Fix
+
+on:
+  push:
+    branches: ["feat/sprint-17-raster-processing"]
+    paths: [".github/workflows/sprint17-fix.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/sprint-17-raster-processing
+      - name: Fix repository compile guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/backend/AgroControl.Infrastructure/Persistence/RasterProcessingRepository.cs')
+          s = p.read_text()
+          old = '''                var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken)
+                    ?? throw;
+                return new RasterRunCreationResult(duplicate, false);'''
+          new = '''                var duplicate = await GetRunByKeyAsync(organizationId, run.ProcessingKey, cancellationToken);
+                if (duplicate is null) throw;
+                return new RasterRunCreationResult(duplicate, false);'''
+          if old not in s:
+              raise SystemExit('expected repository marker not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/backend/AgroControl.Infrastructure/Persistence/RasterProcessingRepository.cs
+          git commit -m "fix(raster): handle idempotency race without invalid throw expression"
+          git push origin HEAD:feat/sprint-17-raster-processing
