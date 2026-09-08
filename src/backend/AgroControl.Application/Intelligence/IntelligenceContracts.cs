@@ -27,6 +27,38 @@ public sealed record YieldPredictionDto(
     DateTime GeneratedAtUtc,
     string? Warning);
 
+public sealed record RasterTargetData(string Key, string GeometryGeoJson);
+
+public sealed record RasterProcessingData(
+    string AssetReference,
+    string GeometryCrs,
+    int Band,
+    IReadOnlyList<RasterTargetData> Targets);
+
+public sealed record RasterMetadataDto(
+    string Crs,
+    int Width,
+    int Height,
+    decimal? Nodata,
+    decimal ResolutionX,
+    decimal ResolutionY);
+
+public sealed record RasterTargetStatisticsDto(
+    string Key,
+    decimal Minimum,
+    decimal Maximum,
+    decimal Mean,
+    decimal Median,
+    decimal StandardDeviation,
+    decimal ValidCoveragePercent,
+    long SampleCount);
+
+public sealed record RasterProcessingIntelligenceDto(
+    string ContractVersion,
+    string Status,
+    RasterMetadataDto Metadata,
+    IReadOnlyList<RasterTargetStatisticsDto> Results);
+
 public enum IntelligenceCallErrorKind
 {
     None = 0,
@@ -51,6 +83,25 @@ public sealed record IntelligenceCallResult(
         new(false, null, IntelligenceCallErrorKind.Timeout, error);
 
     public static IntelligenceCallResult Unavailable(string error) =>
+        new(false, null, IntelligenceCallErrorKind.Unavailable, error);
+}
+
+public sealed record RasterIntelligenceCallResult(
+    bool Succeeded,
+    RasterProcessingIntelligenceDto? Value,
+    IntelligenceCallErrorKind ErrorKind,
+    string? Error)
+{
+    public static RasterIntelligenceCallResult Success(RasterProcessingIntelligenceDto value) =>
+        new(true, value, IntelligenceCallErrorKind.None, null);
+
+    public static RasterIntelligenceCallResult Validation(string error) =>
+        new(false, null, IntelligenceCallErrorKind.Validation, error);
+
+    public static RasterIntelligenceCallResult Timeout(string error) =>
+        new(false, null, IntelligenceCallErrorKind.Timeout, error);
+
+    public static RasterIntelligenceCallResult Unavailable(string error) =>
         new(false, null, IntelligenceCallErrorKind.Unavailable, error);
 }
 
