@@ -49,7 +49,7 @@ function cleanRecord<T>(
     entityKind,
     entityId,
     data,
-    serverVersion: null,
+    serverVersion: updatedAtUtc,
     updatedAtUtc,
     syncState: 'Clean',
     lastSyncedAtUtc
