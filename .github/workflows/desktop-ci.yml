@@ -38,7 +38,7 @@ jobs:
 
       - name: Generate Tauri icons from canonical app icon
         working-directory: src/frontend
-        run: npx --yes @tauri-apps/cli@2 icon public/icons/icon-512.png
+        run: npx --yes @tauri-apps/cli@2 icon public/icons/agrocontrol.svg
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
