@@ -50,6 +50,7 @@ builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<SeasonService>();
 builder.Services.AddScoped<OfflineSyncService>();
+builder.Services.AddScoped<OfflinePushService>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<IrrigationService>();
 builder.Services.AddScoped<SustainabilityService>();
