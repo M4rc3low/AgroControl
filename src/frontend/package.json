@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "npm run typecheck && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "desktop:icons": "npx --yes @tauri-apps/cli@2 icon public/icons/agrocontrol.svg",
+    "desktop:dev": "npm run desktop:icons && npx --yes @tauri-apps/cli@2 dev",
+    "desktop:build": "npm run desktop:icons && npx --yes @tauri-apps/cli@2 build"
   },
   "dependencies": {
     "react": "19.2.8",

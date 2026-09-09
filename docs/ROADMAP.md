@@ -212,28 +212,53 @@ Este roadmap registra o estado funcional consolidado do projeto. Detalhes técni
 - [x] métricas STAC sem labels de alta cardinalidade;
 - [x] testes backend/frontend e documentação;
 - [x] API `0.19.0`;
-- [ ] Backend CI, Frontend CI, Platform CI e CodeQL verdes no mesmo head final;
-- [ ] PR #56 mesclado por squash;
-- [ ] Issue #53 encerrada como `completed`.
+- [x] Backend CI, Frontend CI, Platform CI e CodeQL verdes no mesmo head final;
+- [x] PR #56 mesclado por squash;
+- [x] Issue #53 encerrada como `completed`.
+
+## Sprint 20 — Web instalável + Desktop Tauri 🚧
+
+- [x] mesma SPA React/Vite para navegador, PWA e Desktop;
+- [x] manifest PWA e ícones 192/512;
+- [x] service worker limitado ao app shell/assets estáticos;
+- [x] exclusão explícita de `/api` e `/health` do cache offline;
+- [x] indicador visual de perda de conexão;
+- [x] service worker desabilitado dentro do shell Tauri;
+- [x] shell Tauri v2 sem comandos Rust/plugins privilegiados;
+- [x] `withGlobalTauri=false` e capabilities vazias;
+- [x] CSP com hosts explícitos para API de CI e mapas padrão;
+- [x] CORS da API por allowlist para `tauri.localhost`;
+- [x] sessão JWT compartilhada via `sessionStorage`, sem persistência nativa adicional;
+- [x] alvo Windows com bundles NSIS e MSI configurados;
+- [x] Desktop CI Windows dedicado;
+- [x] artefatos classificados como não assinados enquanto não houver certificado real;
+- [x] documentação `SPRINT_20_INSTALLABLE_APP.md`;
+- [ ] provar geração dos instaladores Windows no CI;
+- [ ] atualizar README e ARCHITECTURE;
+- [ ] API `0.20.0` e documentação final;
+- [ ] Frontend CI, Desktop CI, Backend CI, Platform CI e CodeQL verdes no mesmo head final;
+- [ ] PR #58 mesclado por squash;
+- [ ] Issue #57 encerrada como `completed`.
 
 ## Estado atual
 
-As Sprints 0–18 estão concluídas e mescladas. A Sprint 19 está funcionalmente concluída e em gate final de CI/merge.
+As Sprints 0–19 estão concluídas e mescladas. A Sprint 20 está em implementação e validação de distribuição instalável.
 
-A base atual suporta uma organização com múltiplas propriedades em diferentes regiões, UFs e fusos horários sem criar tenants separados, preserva autorização horizontal e agora também descobre/importa cenas geoespaciais por STAC sem transformar o backend em proxy HTTP aberto.
+A arquitetura preserva a Web como interface canônica e adiciona PWA/desktop sem criar um segundo produto ou mover regras de autorização para o cliente. O modo offline atual cobre somente o app shell; sincronização de dados de negócio permanece fora do escopo.
 
 ## Próximas evoluções candidatas
 
-As próximas sprints devem ser definidas separadamente, sem reabrir o escopo da Sprint 19. Candidatos:
+As próximas sprints devem ser definidas separadamente. Candidatos:
 
+- sincronização offline segura e resolução de conflitos;
 - ingestão assíncrona/cache de assets grandes;
 - máscaras de qualidade/nuvem;
 - geração de produtos a partir de bandas brutas;
 - mosaico de cenas;
 - importação KML/Shapefile;
 - aprofundamento agronômico;
-- sincronização offline;
-- distribuição Web, PWA ou desktop instalável;
+- assinatura e atualização automática do desktop após definição da distribuição oficial;
+- aplicativo móvel nativo quando houver necessidade comprovada;
 - integrações oficiais CAR/SIGEF/IBGE;
 - hardening de produção dependente de política/infraestrutura real.
 

@@ -44,6 +44,17 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Verify installable web artifacts
+        run: |
+          set -euo pipefail
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+          test -f dist/icons/agrocontrol.svg
+          grep -q '"display": "standalone"' dist/manifest.webmanifest
+          grep -q '"sizes": "192x192"' dist/manifest.webmanifest
+          grep -q '"sizes": "512x512"' dist/manifest.webmanifest
+          grep -q "url.pathname.startsWith('/api/')" dist/sw.js
+
       - name: Build container image
         working-directory: .
         run: docker build -f src/frontend/Dockerfile -t agrocontrol-web:test .

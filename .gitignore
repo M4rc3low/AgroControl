@@ -20,6 +20,10 @@ dist/
 coverage/
 .npm/
 
+# Tauri generated assets/build output
+src/frontend/src-tauri/icons/
+src/frontend/src-tauri/target/
+
 # Python
 __pycache__/
 *.py[cod]
