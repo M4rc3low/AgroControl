@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using AgroControl.Api.Authorization;
 using AgroControl.Application.Common;
@@ -51,6 +52,7 @@ public static class SyncEndpoints
             int take = 200,
             CancellationToken ct = default) =>
         {
+            var started = Stopwatch.GetTimestamp();
             var result = await service.PullAsync(
                 GetOrganizationId(user),
                 GetUserId(user),
@@ -58,6 +60,21 @@ public static class SyncEndpoints
                 cursor,
                 take,
                 ct);
+
+            if (!result.Succeeded &&
+                result.ErrorKind == OperationErrorKind.Validation &&
+                result.Error?.Contains("cursor", StringComparison.OrdinalIgnoreCase) == true)
+            {
+                OfflineSyncTelemetry.RecordInvalidCursor();
+            }
+            if (!result.Succeeded && result.ErrorKind == OperationErrorKind.Forbidden)
+                OfflineSyncTelemetry.RecordAccessRevocation("pull");
+
+            OfflineSyncTelemetry.RecordBatch(
+                "pull",
+                result.Succeeded ? "completed" : result.ErrorKind?.ToString() ?? "other",
+                started,
+                result.Value?.Changes.Count ?? 0);
 
             return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
         });
@@ -68,11 +85,33 @@ public static class SyncEndpoints
             OfflinePushService service,
             CancellationToken ct) =>
         {
+            var started = Stopwatch.GetTimestamp();
             var result = await service.PushAsync(
                 GetOrganizationId(user),
                 GetUserId(user),
                 request,
                 ct);
+
+            if (result.Succeeded)
+            {
+                foreach (var operation in result.Value!.Results)
+                {
+                    OfflineSyncTelemetry.RecordOperation(operation.EntityKind, operation.Status, operation.Replayed);
+                    if (operation.Status == "RetryableError") OfflineSyncTelemetry.RecordRetry();
+                    if (operation.Status == "Forbidden" && operation.ErrorCode == "FarmAccessRevoked")
+                        OfflineSyncTelemetry.RecordAccessRevocation("push");
+                }
+            }
+            else if (result.ErrorKind == OperationErrorKind.Forbidden)
+            {
+                OfflineSyncTelemetry.RecordAccessRevocation("push");
+            }
+
+            OfflineSyncTelemetry.RecordBatch(
+                "push",
+                result.Succeeded ? "completed" : result.ErrorKind?.ToString() ?? "other",
+                started,
+                request?.Operations?.Count ?? 0);
 
             return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
         });
