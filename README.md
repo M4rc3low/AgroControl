@@ -2,162 +2,94 @@
 
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo transacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência e processamento científico, **Java / Spring Boot** para telemetria e uma única aplicação **React + TypeScript + Vite** distribuída em navegador, PWA e Desktop Windows.
 
-> Status: **Sprint 20 — Web instalável + Desktop Tauri em validação final**  
-> API: **0.19.0**  
+> Status: **Sprint 21 concluída — offline real por fazenda + sincronização controlada**  
+> API: **0.21.0**  
 > Desktop: **0.20.0**
 
 ## Objetivo
 
-Centralizar os principais fluxos de uma operação rural em uma plataforma única, preservando:
+Centralizar a operação rural em uma plataforma única preservando:
 
-- isolamento multi-tenant por organização;
-- escopo operacional por fazenda e região;
-- módulos liberados por plano no backend;
-- dados geoespaciais e operacionais integrados;
-- serviços especializados somente quando existe fronteira técnica clara;
-- uma única base de interface para Web, PWA e Desktop;
-- segurança e autorização sempre server-side.
+- isolamento multi-tenant por `OrganizationId`;
+- autorização horizontal por `FarmAccessScope`;
+- módulos liberados por entitlement no backend;
+- geoprocessamento e inteligência em serviços especializados;
+- uma única interface para Web, PWA e Desktop;
+- operação offline opt-in sem transformar o cliente em autoridade de negócio.
 
-## Superfícies do produto
+## Arquitetura
 
 ```text
-                    AgroControl React / TypeScript / Vite
-                                  │
-                 ┌────────────────┼────────────────┐
-                 │                │                │
-                 ▼                ▼                ▼
-             Navegador           PWA          Tauri Desktop
-                 │                │                │
-                 └────────────────┴────────────────┘
-                                  │ HTTPS
-                                  ▼
-                           AgroControl API
-                                  │
-              ┌───────────────────┼───────────────────┐
-              ▼                   ▼                   ▼
-      PostgreSQL/PostGIS     Intelligence        Telemetry
-                              Python              Java/MQTT
+Browser / PWA / Tauri Desktop
+            │
+            ▼
+   React + TypeScript + Vite
+            │
+     ┌──────┴─────────┐
+     │                │
+     │ online         │ offline por fazenda
+     │                ▼
+     │          IndexedDB OfflineStore
+     │          ├── records
+     │          ├── outbox
+     │          └── syncMetadata
+     │                │
+     └──────────┬─────┘
+                ▼
+       AgroControl API 0.21.0
+                │
+      ┌─────────┼──────────┐
+      ▼         ▼          ▼
+ PostgreSQL   Python      Java
+ + PostGIS   Intelligence Telemetry/MQTT
 ```
 
-A interface React é canônica. Não existe fork de telas, contratos ou regras de autorização para Desktop.
-
-### Navegador
-
-- aplicação React servida por Nginx;
-- proxy same-origin para `/api` e `/health`;
-- sessão JWT;
-- funcionamento completo enquanto a API está disponível.
-
-### PWA
-
-- manifest instalável;
-- ícone vetorial próprio;
-- `display: standalone`;
-- service worker para app shell e assets estáticos;
-- indicador explícito de perda de conexão;
-- atualização controlada do shell.
-
-O service worker **não cacheia dados de negócio autenticados** e exclui `/api` e `/health` da estratégia offline.
-
-### Desktop Windows
-
-- Tauri v2 + WebView2;
-- mesma SPA React/Vite;
-- bundles NSIS `.exe` e MSI `.msi`;
-- nenhum backend C#, PostgreSQL, Python ou Java embutido;
-- sem comandos Rust privilegiados nesta fase;
-- `withGlobalTauri=false`;
-- capabilities vazias;
-- DevTools desabilitadas na distribuição;
-- CSP explícita;
-- CORS por allowlist na API;
-- service worker PWA desabilitado dentro do Tauri.
-
-Os instaladores produzidos pelo CI são **artefatos de validação não assinados**. Distribuição pública oficial depende de URL HTTPS real da API, CSP final e certificado de assinatura de código.
+A API continua sendo a autoridade para autenticação, tenant, entitlement, `FarmAccessScope`, validação de negócio, idempotência e resolução de concorrência.
 
 ## Stack
 
 | Camada | Tecnologia |
 |---|---|
-| Interface | React 19 + TypeScript 7 + Vite 8 |
+| Interface | React 19 + TypeScript + Vite |
 | PWA | Web App Manifest + Service Worker |
 | Desktop | Tauri v2 + Rust + WebView2 |
-| API principal | C# + ASP.NET Core / .NET 10 |
-| Banco principal | PostgreSQL 17 + PostGIS + Entity Framework Core |
+| API | C# + ASP.NET Core / .NET 10 |
+| Banco principal | PostgreSQL 17 + PostGIS + EF Core |
 | Inteligência | Python 3.12 + FastAPI + scikit-learn + Rasterio + NumPy |
-| Telemetria / IoT | Java 21 + Spring Boot |
-| Banco de telemetria | PostgreSQL dedicado |
-| Mensageria IoT | MQTT + Eclipse Mosquitto |
+| Telemetria | Java 21 + Spring Boot + MQTT |
 | Mapas | MapLibre GL + GeoJSON |
-| Catálogo geoespacial | STAC API / STAC Items |
-| Autenticação | JWT |
-| Containers | Docker / Docker Compose |
+| Catálogo geoespacial | STAC API |
 | Observabilidade | OpenTelemetry + Prometheus + Tempo + Grafana |
-| CI/CD | GitHub Actions + GHCR |
+| Containers | Docker / Docker Compose |
 | Orquestração | Kubernetes + Kustomize |
-
-## Arquitetura
-
-```mermaid
-flowchart TB
-    USER[Usuário] --> BROWSER[Navegador]
-    USER --> PWA[PWA instalada]
-    USER --> DESKTOP[Desktop Windows\nTauri + WebView2]
-
-    BROWSER --> WEB[AgroControl React]
-    PWA --> WEB
-    DESKTOP --> WEB
-
-    WEB --> API[AgroControl API\nC# / ASP.NET Core]
-    API --> DB[(PostgreSQL + PostGIS Core)]
-    API --> AI[AgroControl Intelligence\nPython / FastAPI / Rasterio]
-    API --> TEL[AgroControl Telemetry\nJava / Spring Boot]
-    API --> STAC[STAC Provider configurado]
-
-    TEL --> TDB[(PostgreSQL Telemetry)]
-    SENSORS[Sensores / GPS / Estações / Máquinas] --> MQTT[MQTT / Mosquitto]
-    MQTT --> TEL
-
-    API -. OTLP .-> OTEL[OpenTelemetry Collector]
-    AI -. OTLP .-> OTEL
-    TEL -. OTLP .-> OTEL
-    OTEL --> TEMPO[Tempo]
-    OTEL --> PROM[Prometheus]
-    PROM --> GRAFANA[Grafana]
-    TEMPO --> GRAFANA
-```
-
-A API concentra identidade, assinatura, autorização, `OrganizationId`, `FarmAccessScope`, entitlements e regras transacionais. Python é reservado para modelagem/processamento científico. Java é reservado para ingestão e histórico de telemetria.
+| CI/CD | GitHub Actions + GHCR |
 
 ## Cobertura funcional
 
-O AgroControl já possui base funcional para:
+O AgroControl inclui:
 
-- propriedades, regiões operacionais, talhões, culturas e safras;
-- operação multi-fazenda em diferentes estados e fusos horários;
-- acesso `AllFarms`, por região e por fazenda;
-- limites geográficos, GeoJSON, PostGIS e zonas de manejo;
-- cenas de satélite/drone, footprints e índices vegetativos;
-- descoberta STAC e importação controlada de cenas;
-- processamento raster com Rasterio/NumPy e estatísticas zonais;
-- estoque e movimentações de insumos;
-- custos, receitas, fluxo de caixa e rentabilidade;
-- máquinas, horímetro, combustível e manutenção;
-- commodities, cotações e alertas de mercado;
-- previsão de produtividade e apoio à decisão;
-- sensores, GPS, estações e telemetria MQTT;
-- irrigação e manejo hídrico;
-- sustentabilidade e indicadores de CO₂e;
-- exportação e logística internacional;
-- clientes, contatos, oportunidades e pipeline comercial;
+- propriedades, regiões, talhões, culturas e safras;
+- operação multi-fazenda e fusos por propriedade;
+- estoque e movimentações;
+- financeiro e rentabilidade;
+- máquinas, combustível, horímetro e manutenção;
+- commodities e mercado;
+- agricultura de precisão, PostGIS e zonas de manejo;
+- sensoriamento remoto, STAC, índices vegetativos e raster;
+- previsão de produtividade;
+- telemetria MQTT;
+- irrigação;
+- sustentabilidade e CO₂e;
+- exportação e logística;
+- CRM/pipeline comercial;
 - dashboard e mapa multi-fazenda;
-- instalação como PWA;
-- distribuição Desktop Windows via Tauri.
+- PWA e Desktop Tauri;
+- **modo offline real para produção rural por fazenda**.
 
-## Multi-tenancy e operação multi-fazenda
+## Multi-tenancy e escopo operacional
 
 ```text
-OrganizationId — fronteira máxima do tenant
+OrganizationId
       │
       └── FarmAccessScope
               ├── AllFarms
@@ -165,103 +97,167 @@ OrganizationId — fronteira máxima do tenant
               └── Farm
 ```
 
-Uma organização pode operar várias propriedades sem criar tenants separados:
+O papel organizacional e o escopo operacional são conceitos distintos. O backend resolve o escopo efetivo em cada request e aplica proteção horizontal em módulos ligados a Farm/Field.
+
+Testes exercitam Fazenda A × Fazenda B na mesma organização e Organização A × Organização B.
+
+## Offline real — Sprint 21
+
+O modo offline é **opt-in por fazenda**. Um usuário autorizado escolhe explicitamente `Disponibilizar offline`; o sistema não baixa automaticamente todas as propriedades de um usuário `AllFarms`.
+
+### Namespace local
+
+Cada cópia é isolada por:
 
 ```text
-Organization
-├── OperationalRegion
-│   ├── Farm A
-│   │   ├── Field
-│   │   └── Season
-│   └── Farm B
-└── Farm C
+UserId + OrganizationId + FarmId
 ```
 
-O papel organizacional (`Owner`, `Admin`, `Manager`, `Viewer`) e o escopo de fazenda são conceitos distintos. O backend resolve o escopo efetivo por request.
+JWT, senha, API key e secrets **não** são persistidos no banco offline.
 
-A proteção horizontal é aplicada em produção, estoque, financeiro, máquinas, irrigação, sustentabilidade, exportação, comercial, agricultura de precisão, sensoriamento remoto, raster e telemetria vinculada a Farm/Field/Machine.
+### Allowlist inicial
 
-Testes automatizados exercitam **Fazenda A × Fazenda B dentro da mesma organização** para impedir acesso por listagem, ID direto, contagens ou entidades-filhas fora do escopo.
+Leitura offline:
 
-## Planos e módulos
+- Farm selecionada;
+- Fields;
+- Crops referenciados;
+- Seasons.
 
-O catálogo canônico está no backend em `PlanEntitlementCatalog`.
+Mutações offline:
 
-- **Basic:** identidade, organização, produção, estoque e financeiro;
-- **Pro:** Basic + máquinas, mercado, agricultura de precisão, irrigação, sustentabilidade e comercial;
-- **Intelligence:** Pro + Intelligence e Telemetry;
-- **Enterprise:** todos os módulos, incluindo Export.
+- Field: create/update/delete lógico;
+- Season: create/update/delete lógico.
 
-Overrides por organização podem habilitar ou desabilitar módulos individualmente. O frontend pode apresentar um módulo bloqueado, mas a autorização real permanece na API.
+Financeiro, telemetria histórica, raster, tiles e documentos pesados não entram automaticamente nessa allowlist.
 
-Veja [`docs/MODULES.md`](docs/MODULES.md).
+### Protocolo
 
-## Agricultura de precisão e sensoriamento remoto
+```text
+GET  /api/v1/sync/status?farmId=...
+GET  /api/v1/sync/bootstrap?farmId=...
+GET  /api/v1/sync/pull?farmId=...&cursor=...
+POST /api/v1/sync/push
+```
 
-- PostGIS no banco principal;
-- limites de talhão WGS84/SRID 4326;
-- GeoJSON e validação topológica;
-- índice espacial GiST;
-- cálculo geodésico de área;
-- zonas `Soil`, `Yield`, `Vegetation`, `Prescription` e `Custom`;
-- cenas `Satellite`, `Drone` e `Other`;
-- NDVI, NDRE, EVI e índices customizados;
-- séries temporais e latest metrics;
-- MapLibre na interface.
+Características:
 
-### Descoberta STAC
+- bootstrap limitado a uma fazenda;
+- cursor opaco, protegido e farm-scoped;
+- change-log monotônico server-side;
+- pull incremental paginado;
+- push em lote de até 100 operações;
+- idempotência persistida por organização/usuário/operação;
+- retenção da chave idempotente por 30 dias;
+- `FOR UPDATE` em update/delete;
+- `serverVersion` baseado em timestamp UTC canônico com precisão compatível com PostgreSQL;
+- ACK perdido pode ser reenviado sem duplicar efeito;
+- operação só sai da outbox depois de ACK válido.
 
-- providers configurados server-side;
-- busca pelo boundary canônico do Field;
-- filtros de período, coleção, nuvens e provider;
-- paginação protegida;
-- normalização de metadata e assets;
-- importação explícita;
-- reconsulta server-side do item antes da importação;
-- seleção por `AssetKey`, sem confiar em URL enviada pelo cliente;
-- idempotência por `Provider + ExternalId`;
-- proteção por `OrganizationId + FarmAccessScope`.
+### Outbox e estados
 
-A descoberta não baixa nem processa raster automaticamente. Importação e processamento são etapas distintas.
+```text
+Record:
+Clean
+PendingCreate
+PendingUpdate
+PendingDelete
+Conflict
+Failed
 
-### Raster
+Mutation:
+Pending
+Retryable
+Conflict
+Failed
+```
 
-- Rasterio + NumPy;
-- GeoTIFF/COG;
-- reprojeção de CRS;
-- máscara e NoData;
-- estatísticas zonais;
-- processamento por talhão e zona de manejo;
-- lifecycle `Pending`, `Processing`, `Succeeded`, `Failed`;
-- idempotência por chave de processamento.
+`record + outbox` são gravados atomicamente no IndexedDB. O cliente não permite duas mutações pendentes concorrentes para a mesma entidade.
 
-NDVI, previsões e resultados raster são **apoio à decisão** e não diagnóstico agronômico automático.
+### Conflitos
 
-## Intelligence
+Não existe last-write-wins silencioso para Field/Season.
 
-- FastAPI independente;
-- contrato HTTP versionado `v1`;
-- baseline e regressão Ridge;
-- MAE/RMSE;
-- `insufficient_data` quando não existe histórico confiável;
-- Rasterio/NumPy para processamento científico;
-- cliente HTTP C# com timeout e tratamento de indisponibilidade.
+Quando a versão-base não coincide com o servidor:
 
-## Telemetry
+- backend retorna `Conflict`;
+- cliente mantém a proposta local;
+- snapshot atual do servidor é preservado;
+- usuário pode usar a versão do servidor;
+- ou reaplicar sua alteração usando a versão atual e **novo `operationId`**.
 
-- Java 21 + Spring Boot;
-- PostgreSQL próprio;
-- dispositivos por organização;
-- vínculos com Farm/Field/Machine;
-- eventos append-only;
-- idempotência por `deviceId + eventId`;
-- última leitura e histórico;
-- MQTT QoS 1;
-- fachada C# aplicando escopo operacional antes do acesso ao serviço Java.
+### Retry e reconexão
 
-## Execução local da plataforma
+- falha transitória permanece na outbox como `Retryable`;
+- resposta sem ACK também permanece para retry;
+- sync automático é disparado ao recuperar conexão com debounce;
+- retries dentro de uma execução usam backoff exponencial limitado;
+- pull só ocorre quando a outbox não possui operação enviável, conflito ou rejeição pendente.
 
-Na raiz do repositório:
+### Revogação de acesso
+
+O backend revalida `FarmAccessScope` no início do push e antes de cada operação do lote.
+
+Se o acesso for removido enquanto o dispositivo esteve offline:
+
+- novos pushes/pulls são rejeitados;
+- o cliente remove records e outbox da fazenda;
+- mantém somente metadata `Blocked` com o motivo;
+- o namespace não volta a sincronizar sem nova autorização/preparação.
+
+Logout explícito e troca de usuário/organização também limpam material offline do contexto anterior. Reabrir o app e autenticar novamente como o mesmo usuário preserva a cópia offline válida.
+
+## Limites de sync
+
+Bootstrap inicial:
+
+- até 2.000 Fields;
+- até 10.000 Seasons;
+- até 1.000 Crops referenciados.
+
+Pull incremental:
+
+- até 500 mudanças por página.
+
+Push:
+
+- até 100 operações por lote.
+
+## Observabilidade
+
+O backend emite métricas OpenTelemetry de sync com labels de baixa cardinalidade:
+
+- batches push/pull;
+- duração;
+- tamanho de lote;
+- resultado de operações;
+- retries;
+- cursores inválidos;
+- revogações detectadas.
+
+`UserId`, `FarmId` e `operationId` não são labels de métricas.
+
+## Segurança
+
+Princípios:
+
+- autenticação JWT no backend;
+- tenant por `OrganizationId`;
+- autorização horizontal por `FarmAccessScope`;
+- entitlement validado server-side;
+- frontend nunca é fronteira de autorização;
+- secrets fora do repositório;
+- CORS por allowlist;
+- CSP explícita no Tauri;
+- service worker sem cache de dados autenticados;
+- OfflineStore sem JWT/secrets;
+- push reautoriza a fazenda e impede cross-farm/cross-tenant;
+- cursor não amplia escopo;
+- CodeQL e Dependabot.
+
+## Execução local
+
+Na raiz:
 
 ```bash
 cp .env.example .env
@@ -271,13 +267,12 @@ docker compose up --build
 Serviços padrão:
 
 ```text
-AgroControl Web          http://localhost:3001
-AgroControl API          http://localhost:8080
-AgroControl Intelligence http://localhost:8090
-AgroControl Telemetry    http://localhost:8100
-PostgreSQL + PostGIS     localhost:5432
-PostgreSQL Telemetry     localhost:5433
-MQTT / Mosquitto         localhost:1883
+Web          http://localhost:3001
+API          http://localhost:8080
+Intelligence http://localhost:8090
+Telemetry    http://localhost:8100
+PostgreSQL   localhost:5432
+MQTT         localhost:1883
 ```
 
 Observabilidade opcional:
@@ -286,7 +281,7 @@ Observabilidade opcional:
 OTEL_ENABLED=true docker compose --profile observability up --build
 ```
 
-## Desenvolvimento da Web
+## Desenvolvimento frontend
 
 ```bash
 cd src/frontend
@@ -294,187 +289,38 @@ npm ci
 npm run dev
 ```
 
-Build de produção:
+Build:
 
 ```bash
 npm run build
 ```
 
-## PWA
-
-A PWA usa o mesmo build da Web. O manifest e o service worker são copiados para `dist/` durante o build do Vite.
-
-A fonte canônica dos ícones é:
-
-```text
-src/frontend/public/icons/agrocontrol.svg
-```
-
-A PWA instala o shell da aplicação, mas **não transforma dados autenticados em cache offline**.
-
-## Desktop Windows
-
-Pré-requisitos de desenvolvimento:
-
-- Node.js compatível com o projeto;
-- Rust stable;
-- toolchain Windows necessária ao Tauri/WebView2.
-
-No diretório `src/frontend`:
+Desktop:
 
 ```bash
-npm ci
 npm run desktop:dev
-```
-
-Para gerar os instaladores:
-
-```bash
 npm run desktop:build
 ```
 
-Antes do build, `desktop:icons` usa o Tauri CLI para gerar os ícones nativos a partir de `public/icons/agrocontrol.svg`.
+## CI
 
-Em CI, o Windows build gera:
+A política de fechamento de sprint exige, no mesmo head final do PR:
 
-```text
-NSIS  .exe
-MSI   .msi
-```
-
-Esses artefatos permanecem não assinados enquanto não existir certificado real de code signing.
-
-### API no Desktop
-
-O Desktop usa `VITE_API_BASE_URL` no momento do build. O CI utiliza `http://localhost:8080` somente para validação.
-
-Um release público deve usar uma URL HTTPS real e adicionar **essa origem específica** à CSP. Não é usado wildcard `https:` para liberar qualquer endpoint.
-
-No Windows, a origem de produção do shell Tauri é permitida por CORS explícito na API. CORS não substitui autenticação: JWT, tenant, entitlement e `FarmAccessScope` continuam sendo validados pelo backend.
-
-## Offline: limite atual
-
-A Sprint 20 entrega **instalação**, não sincronização offline de dados de negócio.
-
-Atualmente:
-
-- o shell PWA pode ser aberto sem rede;
-- assets estáticos podem ser servidos do cache;
-- `/api` e `/health` nunca são cacheados pelo service worker;
-- Desktop não adiciona banco local;
-- não existe fila local de alterações;
-- não existe merge automático de conflitos;
-- raster/mapas operacionais não são baixados automaticamente para uso offline.
-
-Offline real será tratado em uma sprint própria com armazenamento local, outbox, idempotência, versionamento, autorização na sincronização e resolução explícita de conflitos.
-
-## Segurança
-
-Princípios atuais:
-
-- JWT e autorização no backend;
-- isolamento por `OrganizationId`;
-- restrição horizontal por `FarmAccessScope`;
-- entitlement validado na API;
-- frontend nunca é fronteira de autorização;
-- secrets fora do repositório;
-- CORS por allowlist;
-- CSP explícita no Tauri;
-- `withGlobalTauri=false`;
-- capabilities Tauri vazias na fase inicial;
-- nenhum comando Rust privilegiado exposto;
-- service worker sem cache de dados autenticados;
-- JWT continua em `sessionStorage`, sem persistência nativa adicional;
-- CodeQL e Dependabot;
-- STAC providers definidos server-side;
-- assets raster remotos desabilitados por padrão no Intelligence;
-- instalador oficial condicionado a code signing real.
-
-Uma evolução para BFF/cookie HttpOnly pode ser adotada quando o modelo de exposição pública justificar esse endurecimento.
-
-## Health checks
-
-```text
-API          GET /health/live
-API          GET /health/ready
-Intelligence GET /health/live
-Intelligence GET /health/ready
-Telemetry    GET /actuator/health/liveness
-Telemetry    GET /actuator/health/readiness
-Telemetry    GET /actuator/prometheus
-Web          GET /
-```
-
-## Kubernetes
-
-```bash
-kubectl kustomize k8s/base
-kubectl kustomize k8s/overlays/local
-```
-
-Segredos reais não entram no repositório.
-
-## Qualidade e CI/CD
-
-- **Backend CI:** PostgreSQL/PostGIS, restore, build e testes .NET;
-- **Intelligence CI:** Ruff, pytest, imagem e smoke test;
-- **Telemetry CI:** Maven, PostgreSQL, imagem e MQTT ponta a ponta;
-- **Frontend CI:** npm, TypeScript, Vitest, PWA artifacts, build, container e smoke test;
-- **Desktop CI:** geração de ícones Tauri + build Windows NSIS/MSI;
-- **Platform CI:** stack integrada, PostGIS, observabilidade, Kustomize e smoke tests;
-- **CodeQL:** C#, Java/Kotlin, Python e JavaScript/TypeScript;
-- **Dependabot:** NuGet, pip, Maven, npm e GitHub Actions.
-
-A Sprint 20 só é encerrada com **Frontend CI + Desktop CI + Backend CI + Platform CI + CodeQL** verdes no mesmo head final.
+- Backend CI;
+- Frontend CI;
+- Platform CI;
+- Desktop CI;
+- CodeQL.
 
 ## Documentação
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-- [`docs/DOMAIN.md`](docs/DOMAIN.md)
 - [`docs/MODULES.md`](docs/MODULES.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
-- [`docs/SPRINT_6_INTELLIGENCE.md`](docs/SPRINT_6_INTELLIGENCE.md)
-- [`docs/SPRINT_7_TELEMETRY.md`](docs/SPRINT_7_TELEMETRY.md)
-- [`docs/SPRINT_8_PLATFORM_DEVOPS.md`](docs/SPRINT_8_PLATFORM_DEVOPS.md)
-- [`docs/SPRINT_9_WEB.md`](docs/SPRINT_9_WEB.md)
-- [`docs/SPRINT_10_PRECISION_AGRICULTURE.md`](docs/SPRINT_10_PRECISION_AGRICULTURE.md)
-- [`docs/SPRINT_11_IRRIGATION.md`](docs/SPRINT_11_IRRIGATION.md)
-- [`docs/SPRINT_12_SUSTAINABILITY.md`](docs/SPRINT_12_SUSTAINABILITY.md)
-- [`docs/SPRINT_13_EXPORT.md`](docs/SPRINT_13_EXPORT.md)
-- [`docs/SPRINT_14_COMMERCIAL.md`](docs/SPRINT_14_COMMERCIAL.md)
-- [`docs/SPRINT_15_GEOSPATIAL_ZONES.md`](docs/SPRINT_15_GEOSPATIAL_ZONES.md)
-- [`docs/SPRINT_16_REMOTE_SENSING.md`](docs/SPRINT_16_REMOTE_SENSING.md)
-- [`docs/SPRINT_17_RASTER_PROCESSING.md`](docs/SPRINT_17_RASTER_PROCESSING.md)
-- [`docs/SPRINT_18_MULTI_FARM.md`](docs/SPRINT_18_MULTI_FARM.md)
 - [`docs/SPRINT_19_STAC_DISCOVERY.md`](docs/SPRINT_19_STAC_DISCOVERY.md)
-- [`docs/SPRINT_20_INSTALLABLE_APP.md`](docs/SPRINT_20_INSTALLABLE_APP.md)
-
-## Roadmap resumido
-
-1. ✅ Sprint 0 — fundação, arquitetura, CI e containers.
-2. ✅ Sprint 1 — identidade, organizações e autorização por módulo.
-3. ✅ Sprint 2 — produção rural.
-4. ✅ Sprint 3 — estoque.
-5. ✅ Sprint 4 — financeiro e rentabilidade.
-6. ✅ Sprint 5 — máquinas e mercado.
-7. ✅ Sprint 6 — Python / Intelligence.
-8. ✅ Sprint 7 — Java / Telemetry / MQTT.
-9. ✅ Sprint 8 — observabilidade, CI/CD e Kubernetes.
-10. ✅ Sprint 9 — AgroControl Web.
-11. ✅ Sprint 10 — PostGIS, GeoJSON e talhões georreferenciados.
-12. ✅ Sprint 11 — irrigação e manejo hídrico.
-13. ✅ Sprint 12 — sustentabilidade e CO₂e.
-14. ✅ Sprint 13 — exportação e logística internacional.
-15. ✅ Sprint 14 — Comercial/CRM.
-16. ✅ Sprint 15 — importação GeoJSON e zonas de manejo.
-17. ✅ Sprint 16 — sensoriamento remoto e índices vegetativos.
-18. ✅ Sprint 17 — processamento raster e estatísticas zonais.
-19. ✅ Sprint 18 — operação multi-fazenda e autorização horizontal.
-20. ✅ Sprint 19 — STAC, descoberta de cenas e importação controlada.
-21. 🚧 Sprint 20 — PWA + Desktop Windows Tauri, em validação final.
-
-O hardening dependente de ambiente real, política operacional ou testes de carga permanece separado no issue **#18**.
+- [`docs/SPRINT_20_PWA_TAURI.md`](docs/SPRINT_20_PWA_TAURI.md)
+- [`docs/SPRINT_21_OFFLINE_SYNC.md`](docs/SPRINT_21_OFFLINE_SYNC.md)
 
 ## Licença
 
-A licença ainda não foi definida. Não adicione licença pública ao projeto sem decidir antes o modelo de distribuição do AgroControl.
+Consulte o arquivo `LICENSE` do repositório.
