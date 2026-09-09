@@ -83,7 +83,8 @@ if (builder.Configuration.GetValue<bool>("Observability:Enabled"))
                 "Microsoft.AspNetCore.Hosting",
                 "Microsoft.AspNetCore.Server.Kestrel",
                 "System.Net.Http",
-                RemoteSceneDiscoveryTelemetry.MeterName)
+                RemoteSceneDiscoveryTelemetry.MeterName,
+                OfflineSyncTelemetry.MeterName)
             .AddOtlpExporter());
 }
 
@@ -140,7 +141,7 @@ app.Use(async (httpContext, next) =>
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.19.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.21.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
