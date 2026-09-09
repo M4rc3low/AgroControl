@@ -21,6 +21,11 @@ export interface OfflineStore {
     record: OfflineRecord<TRecord>,
     mutation: OfflineMutation<TPayload>
   ): Promise<void>;
+  replaceMutation<TRecord, TPayload>(
+    previousOperationId: string,
+    record: OfflineRecord<TRecord>,
+    mutation: OfflineMutation<TPayload>
+  ): Promise<void>;
 
   getSyncMetadata(namespaceKey: string): Promise<OfflineSyncMetadata | null>;
   putSyncMetadata(metadata: OfflineSyncMetadata): Promise<void>;
