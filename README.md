@@ -3,8 +3,11 @@
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo transacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência e processamento científico, **Java / Spring Boot** para telemetria e uma única aplicação **React + TypeScript + Vite** distribuída em navegador, PWA e Desktop Windows.
 
 > Status: **Sprint 21 concluída — offline real por fazenda + sincronização controlada**  
+> Release: **0.21.0**  
 > API: **0.21.0**  
-> Desktop: **0.20.0**
+> Desktop: **0.21.0**
+
+> Nota de versionamento: `@agrocontrol/web` é um pacote npm privado com versionamento interno próprio. O número do pacote não representa a versão pública da release do AgroControl.
 
 ## Objetivo
 
@@ -205,7 +208,7 @@ Se o acesso for removido enquanto o dispositivo esteve offline:
 - mantém somente metadata `Blocked` com o motivo;
 - o namespace não volta a sincronizar sem nova autorização/preparação.
 
-Logout explícito e troca de usuário/organização também limpam material offline do contexto anterior. Reabrir o app e autenticar novamente como o mesmo usuário preserva a cópia offline válida.
+Logout explícito e troca de usuário/organização também limpam material offline do contexto anterior. Reabrir o app e autenticar novamente como o mesmo usuário preserva a cópia offline válida conforme a política implementada.
 
 ## Limites de sync
 
@@ -302,15 +305,19 @@ npm run desktop:dev
 npm run desktop:build
 ```
 
-## CI
+O Desktop CI gera bundles Windows NSIS e MSI. A assinatura de distribuição continua fora do repositório até existir certificado/identidade de publicação apropriados.
 
-A política de fechamento de sprint exige, no mesmo head final do PR:
+## CI e política de merge
+
+O fechamento de sprint exige, no mesmo head final do PR:
 
 - Backend CI;
 - Frontend CI;
 - Platform CI;
 - Desktop CI;
 - CodeQL.
+
+O fluxo recomendado é PR + checks verdes + squash merge. A configuração administrativa de branch protection/ruleset da `main` está acompanhada na Issue #52.
 
 ## Documentação
 
@@ -320,6 +327,7 @@ A política de fechamento de sprint exige, no mesmo head final do PR:
 - [`docs/SPRINT_19_STAC_DISCOVERY.md`](docs/SPRINT_19_STAC_DISCOVERY.md)
 - [`docs/SPRINT_20_PWA_TAURI.md`](docs/SPRINT_20_PWA_TAURI.md)
 - [`docs/SPRINT_21_OFFLINE_SYNC.md`](docs/SPRINT_21_OFFLINE_SYNC.md)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## Licença
 
