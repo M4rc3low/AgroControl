@@ -62,6 +62,21 @@ public static class SyncEndpoints
             return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
         });
 
+        group.MapPost("/push", async (
+            OfflinePushRequestDto request,
+            ClaimsPrincipal user,
+            OfflinePushService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.PushAsync(
+                GetOrganizationId(user),
+                GetUserId(user),
+                request,
+                ct);
+
+            return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
+        });
+
         return endpoints;
     }
 
