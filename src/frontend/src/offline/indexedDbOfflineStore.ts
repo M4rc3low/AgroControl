@@ -135,6 +135,54 @@ export class IndexedDbOfflineStore implements OfflineStore {
     await transactionToPromise(transaction);
   }
 
+  async replaceCleanSnapshot(
+    namespaceKey: string,
+    records: OfflineRecord[],
+    metadata: OfflineSyncMetadata
+  ) {
+    if (!namespaceKey.trim()) throw new Error('namespaceKey is required for offline bootstrap.');
+    assertOfflineSyncMetadata(metadata);
+    if (metadata.namespaceKey !== namespaceKey) {
+      throw new Error('Offline bootstrap metadata does not match the target namespace.');
+    }
+
+    const seenKeys = new Set<string>();
+    for (const record of records) {
+      assertOfflineRecord(record);
+      if (record.namespaceKey !== namespaceKey) {
+        throw new Error('Offline bootstrap contains a record from another namespace.');
+      }
+      if (record.syncState !== 'Clean') {
+        throw new Error('Offline bootstrap can only replace clean server snapshots.');
+      }
+      if (seenKeys.has(record.key)) {
+        throw new Error('Offline bootstrap contains duplicate record keys.');
+      }
+      seenKeys.add(record.key);
+    }
+
+    const db = await this.getDb();
+    const transaction = db.transaction(
+      [RECORDS_STORE, OUTBOX_STORE, SYNC_METADATA_STORE],
+      'readwrite'
+    );
+    const outbox = transaction.objectStore(OUTBOX_STORE);
+    const pendingCount = await requestToPromise(
+      outbox.index(NAMESPACE_INDEX).count(IDBKeyRange.only(namespaceKey))
+    );
+
+    if (pendingCount > 0) {
+      transaction.abort();
+      throw new Error('Offline bootstrap cannot replace a namespace with pending local mutations.');
+    }
+
+    const recordsStore = transaction.objectStore(RECORDS_STORE);
+    await this.deleteByNamespace(recordsStore, namespaceKey);
+    for (const record of records) recordsStore.put(record);
+    transaction.objectStore(SYNC_METADATA_STORE).put(metadata);
+    await transactionToPromise(transaction);
+  }
+
   async clearNamespace(namespaceKey: string) {
     const db = await this.getDb();
     const transaction = db.transaction([RECORDS_STORE, OUTBOX_STORE, SYNC_METADATA_STORE], 'readwrite');
@@ -197,9 +245,7 @@ export class IndexedDbOfflineStore implements OfflineStore {
 
   private async deleteByNamespace(store: IDBObjectStore, namespaceKey: string) {
     const keys = await requestToPromise(store.index(NAMESPACE_INDEX).getAllKeys(IDBKeyRange.only(namespaceKey)));
-    for (const key of keys) {
-      store.delete(key);
-    }
+    for (const key of keys) store.delete(key);
   }
 }
 
