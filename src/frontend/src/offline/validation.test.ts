@@ -25,7 +25,8 @@ describe('offline persistence validation', () => {
       serverVersion: '7',
       updatedAtUtc: '2026-09-09T00:00:00Z',
       syncState: 'Clean',
-      lastSyncedAtUtc: '2026-09-09T00:00:00Z'
+      lastSyncedAtUtc: '2026-09-09T00:00:00Z',
+      conflict: null
     })).not.toThrow();
   });
 
@@ -39,7 +40,8 @@ describe('offline persistence validation', () => {
       serverVersion: null,
       updatedAtUtc: '2026-09-09T00:00:00Z',
       syncState: 'Clean',
-      lastSyncedAtUtc: null
+      lastSyncedAtUtc: null,
+      conflict: null
     })).toThrow(/does not match/);
   });
 
@@ -54,11 +56,42 @@ describe('offline persistence validation', () => {
       baseServerVersion: '4',
       createdAtUtc: '2026-09-09T00:00:00Z',
       attempts: 0,
+      state: 'Pending',
       lastError: null
     })).toThrow(/must not persist a payload/);
   });
 
-  it('rejects invalid retry counters and schema versions', () => {
+  it('requires base versions for update/delete and forbids them for create', () => {
+    expect(() => assertOfflineMutation({
+      operationId: 'op-create',
+      namespaceKey,
+      entityKind: 'field',
+      entityId: 'field-new',
+      operation: 'create',
+      payload: { name: 'Novo' },
+      baseServerVersion: 'unexpected',
+      createdAtUtc: '2026-09-09T00:00:00Z',
+      attempts: 0,
+      state: 'Pending',
+      lastError: null
+    })).toThrow(/must not include/);
+
+    expect(() => assertOfflineMutation({
+      operationId: 'op-update',
+      namespaceKey,
+      entityKind: 'field',
+      entityId: 'field-1',
+      operation: 'update',
+      payload: { name: 'Alterado' },
+      baseServerVersion: null,
+      createdAtUtc: '2026-09-09T00:00:00Z',
+      attempts: 0,
+      state: 'Pending',
+      lastError: null
+    })).toThrow(/require a base server version/);
+  });
+
+  it('rejects invalid retry counters, mutation states and schema versions', () => {
     expect(() => assertOfflineMutation({
       operationId: 'op-2',
       namespaceKey,
@@ -69,6 +102,7 @@ describe('offline persistence validation', () => {
       baseServerVersion: '4',
       createdAtUtc: '2026-09-09T00:00:00Z',
       attempts: -1,
+      state: 'Pending',
       lastError: null
     })).toThrow(/non-negative integer/);
 
