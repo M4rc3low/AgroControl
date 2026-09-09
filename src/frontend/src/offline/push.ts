@@ -5,6 +5,7 @@ import type { OfflineStore } from './store';
 import type { OfflineMutation, OfflineNamespace, OfflineRecord } from './types';
 
 const PUSH_BATCH_SIZE = 100;
+type OfflinePushTransport = typeof apiRequest;
 
 interface OfflinePushOperationResultResponse {
   operationId: string;
@@ -148,7 +149,8 @@ async function applyFailure(
 
 export async function pushFarmOffline(
   namespace: OfflineNamespace,
-  store: OfflineStore = offlineStore
+  store: OfflineStore = offlineStore,
+  request: OfflinePushTransport = apiRequest
 ): Promise<OfflinePushResult> {
   const namespaceKey = createOfflineNamespaceKey(namespace);
   await store.initialize();
@@ -176,7 +178,7 @@ export async function pushFarmOffline(
 
   let response: OfflinePushResponse;
   try {
-    response = await apiRequest<OfflinePushResponse>('/api/v1/sync/push', {
+    response = await request<OfflinePushResponse>('/api/v1/sync/push', {
       method: 'POST',
       body: JSON.stringify({
         farmId: namespace.farmId,
