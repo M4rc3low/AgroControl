@@ -80,14 +80,15 @@ function cleanRecord(
   lastSyncedAtUtc: string
 ): OfflineRecord {
   const data = requirePayloadIdentity(payload, entityId);
+  const serverVersion = updatedAtUtc(data);
   return {
     key: createOfflineRecordKey(namespace, entityKind, entityId),
     namespaceKey,
     entityKind,
     entityId,
     data,
-    serverVersion: null,
-    updatedAtUtc: updatedAtUtc(data),
+    serverVersion,
+    updatedAtUtc: serverVersion,
     syncState: 'Clean',
     lastSyncedAtUtc
   };
