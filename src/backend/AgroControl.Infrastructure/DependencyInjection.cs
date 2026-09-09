@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IFarmAccessScope, FarmAccessScopeService>();
         services.AddScoped<IOfflineSyncChangeRepository, OfflineSyncChangeRepository>();
         services.AddScoped<IOfflineSyncIdempotencyRepository, OfflineSyncIdempotencyRepository>();
+        services.AddScoped<IOfflineSyncConcurrencyRepository, OfflineSyncConcurrencyRepository>();
         services.AddScoped<IOfflineSyncTransaction, OfflineSyncTransaction>();
         services.AddSingleton<IOfflineSyncCursorProtector, OfflineSyncCursorProtector>();
         services.AddScoped<IInventoryRepository, InventoryRepository>();
