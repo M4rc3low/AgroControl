@@ -216,7 +216,7 @@ public sealed class OfflinePushService(
 
         if (operationType == "delete")
         {
-            if (operation.Payload is { Value.ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) })
+            if (operation.Payload is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) })
                 return Result(operation, "ValidationError", errorCode: "UnexpectedPayload", message: "Delete operations must not include a payload.");
             var deleted = await fieldService.DeactivateAsync(organizationId, userId, operation.EntityId, cancellationToken);
             if (!deleted.Succeeded) return FromOperationResult(operation, deleted);
@@ -292,7 +292,7 @@ public sealed class OfflinePushService(
 
         if (operationType == "delete")
         {
-            if (operation.Payload is { Value.ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) })
+            if (operation.Payload is { ValueKind: not (JsonValueKind.Null or JsonValueKind.Undefined) })
                 return Result(operation, "ValidationError", errorCode: "UnexpectedPayload", message: "Delete operations must not include a payload.");
             var deleted = await seasonService.DeactivateAsync(organizationId, userId, operation.EntityId, cancellationToken);
             if (!deleted.Succeeded) return FromOperationResult(operation, deleted);
