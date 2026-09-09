@@ -51,11 +51,34 @@ public sealed class Season
         DateOnly startDate,
         DateOnly? endDate,
         decimal? expectedYieldPerHectare,
+        DateTime nowUtc) =>
+        CreateWithId(
+            Guid.NewGuid(),
+            organizationId,
+            fieldId,
+            cropId,
+            name,
+            startDate,
+            endDate,
+            expectedYieldPerHectare,
+            nowUtc);
+
+    public static Season CreateWithId(
+        Guid id,
+        Guid organizationId,
+        Guid fieldId,
+        Guid cropId,
+        string name,
+        DateOnly startDate,
+        DateOnly? endDate,
+        decimal? expectedYieldPerHectare,
         DateTime nowUtc)
     {
+        if (id == Guid.Empty)
+            throw new ArgumentException("Season id is required.", nameof(id));
         Validate(fieldId, cropId, name, startDate, endDate, expectedYieldPerHectare, null);
         return new Season(
-            Guid.NewGuid(),
+            id,
             organizationId,
             fieldId,
             cropId,
