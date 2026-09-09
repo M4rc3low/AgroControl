@@ -18,4 +18,22 @@ public sealed record OfflineBootstrapDto(
     IReadOnlyList<SeasonDto> Seasons,
     int ProtocolVersion,
     int LocalSchemaVersion,
+    DateTime ServerTimeUtc,
+    string Cursor,
+    long WatermarkSequence);
+
+public sealed record OfflinePullChangeDto(
+    long Sequence,
+    string EntityKind,
+    Guid EntityId,
+    string ChangeType,
+    object? Payload,
+    DateTime OccurredAtUtc);
+
+public sealed record OfflinePullDto(
+    Guid FarmId,
+    IReadOnlyList<OfflinePullChangeDto> Changes,
+    string Cursor,
+    long LastSequence,
+    bool HasMore,
     DateTime ServerTimeUtc);
