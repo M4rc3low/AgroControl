@@ -18,6 +18,7 @@ using AgroControl.Application.Production;
 using AgroControl.Application.RegionalOperations;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Application.Sustainability;
+using AgroControl.Application.Sync;
 using AgroControl.Application.Telemetry;
 using AgroControl.Domain.Platform;
 using AgroControl.Infrastructure;
@@ -48,6 +49,7 @@ builder.Services.AddScoped<MultiFarmService>();
 builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<SeasonService>();
+builder.Services.AddScoped<OfflineSyncService>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<IrrigationService>();
 builder.Services.AddScoped<SustainabilityService>();
@@ -189,6 +191,7 @@ authorized.MapGet("/platform/modules/{moduleKey}/access", async (string moduleKe
 
 app.MapProductionEndpoints();
 app.MapMultiFarmEndpoints();
+app.MapSyncEndpoints();
 app.MapInventoryEndpoints();
 app.MapFinanceEndpoints();
 app.MapMachineryEndpoints();
