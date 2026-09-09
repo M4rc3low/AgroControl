@@ -21,5 +21,10 @@ export interface OfflineStore {
   getSyncMetadata(namespaceKey: string): Promise<OfflineSyncMetadata | null>;
   putSyncMetadata(metadata: OfflineSyncMetadata): Promise<void>;
 
+  replaceCleanSnapshot(
+    namespaceKey: string,
+    records: OfflineRecord[],
+    metadata: OfflineSyncMetadata
+  ): Promise<void>;
   clearNamespace(namespaceKey: string): Promise<void>;
 }
