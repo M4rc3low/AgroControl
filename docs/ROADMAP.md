@@ -117,12 +117,15 @@ Este roadmap registra o estado funcional consolidado do projeto. **Sprints 0–2
 - [x] métricas OpenTelemetry de sync sem IDs de alta cardinalidade;
 - [x] testes de bootstrap, cursor, pull, change-log, idempotência, push, ACK, retry, conflito e revogação;
 - [x] API 0.21.0;
+- [x] Desktop 0.21.0;
 - [x] README, ARCHITECTURE, ROADMAP e documentação da sprint atualizados;
-- [ ] gates finais verdes no mesmo head do merge;
-- [ ] PR #60 squash merged;
-- [ ] Issue #59 encerrada como completed.
+- [x] Backend CI + Frontend CI + Platform CI + Desktop CI + CodeQL verdes no mesmo head final;
+- [x] PR #60 squash merged;
+- [x] Issue #59 encerrada como completed.
 
-Os três últimos itens são atualizados somente depois do gate/merge final para manter o roadmap factual.
+## Estado de release
+
+A release funcional consolidada após a Sprint 21 é **0.21.0** para API e Desktop. A aplicação Web/PWA compartilha a mesma base React e o mesmo contrato da API; o número `0.9.0` do pacote npm privado `@agrocontrol/web` é versionamento interno de pacote e não representa a versão pública da release.
 
 ## Próximas evoluções candidatas
 

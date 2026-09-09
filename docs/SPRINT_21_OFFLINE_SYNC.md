@@ -1,13 +1,16 @@
 # Sprint 21 — Offline real por fazenda + sincronização controlada
 
-**Status:** concluída tecnicamente — aguardando apenas gates finais e squash merge.  
-**API:** `0.21.0`
+**Status:** concluída e mesclada.  
+**API:** `0.21.0`  
+**Desktop:** `0.21.0`  
+**PR:** #60 — squash merged  
+**Issue:** #59 — completed
 
 ## Objetivo
 
-Permitir que um usuário autorizado prepare explicitamente uma fazenda para uso offline, continue trabalhando com dados de produção rural sem conexão e sincronize as alterações com segurança ao voltar online.
+Permitir que um usuário autorizado prepare explicitamente uma fazenda para uso offline, continue trabalhando com dados de produção rural sem conexão e sincronize as alterações com segurança quando a rede voltar.
 
-O cliente offline nunca se torna autoridade. Tenant, `FarmAccessScope`, entitlement, concorrência e validações continuam server-side.
+O cliente offline nunca se torna autoridade. Tenant, `FarmAccessScope`, entitlement, concorrência, validações e estado final continuam sendo definidos pelo backend.
 
 ## Invariantes
 
@@ -15,81 +18,135 @@ O cliente offline nunca se torna autoridade. Tenant, `FarmAccessScope`, entitlem
 2. `FarmAccessScope` é a fronteira operacional.
 3. Dados locais são isolados por `UserId + OrganizationId + FarmId`.
 4. JWT, senha, API key e secrets não entram no OfflineStore.
-5. A operação só sai da outbox após ACK válido.
-6. Reenvio após timeout/ACK perdido não duplica efeito.
-7. Não existe last-write-wins silencioso para Field/Season.
-8. Cursor de pull nunca amplia escopo.
-9. Revogação de acesso é respeitada na reconexão e no meio do lote.
-10. Novo domínio só entra na allowlist após definir autorização, idempotência e conflito.
+5. Operações só saem da outbox após ACK válido.
+6. Retry após timeout/ACK perdido não duplica efeito.
+7. Field/Season não usam last-write-wins silencioso.
+8. Revogação de acesso é respeitada na próxima sincronização.
+9. O desktop continua sendo cliente da API central; PostgreSQL, C#, Python e Java não são embutidos no instalador.
 
-## Arquitetura
+## Armazenamento local
 
-```text
-React / PWA / Tauri
-        │
-        ├── IndexedDB OfflineStore
-        │     ├── records
-        │     ├── outbox
-        │     └── syncMetadata
-        │
-        └── Sync Engine
-              ├── push idempotente
-              ├── retry/backoff
-              ├── pull incremental
-              └── conflito explícito
-                      │
-                      ▼
-               AgroControl API
-                      │
-                      ├── change-log
-                      ├── idempotency store
-                      └── FOR UPDATE
-                      │
-                      ▼
-               PostgreSQL/PostGIS
-```
+A SPA usa IndexedDB `agrocontrol.offline` com três stores:
 
-Não há PostgreSQL local, backend C# embutido, sidecar Python/Java ou replicação direta do banco principal.
+- `records` — cópia allowlisted da fazenda;
+- `outbox` — mutações locais pendentes;
+- `syncMetadata` — cursor, estado, última sincronização e bloqueios.
 
-## Namespace local
+O namespace lógico obrigatório é:
 
 ```text
 UserId + OrganizationId + FarmId
 ```
 
-A chave lógica completa participa dos registros e da metadata local. Troca de contexto não mistura stores.
+O store é versionado e valida chaves antes de persistir. Bootstrap e pull não sobrescrevem trabalho local pendente.
 
-## IndexedDB
+## Allowlist da Sprint 21
 
-Banco:
+### Leitura offline
+
+- Farm selecionada;
+- Fields da fazenda;
+- Crops efetivamente referenciados;
+- Seasons da fazenda.
+
+### Mutação offline
+
+- Field: create/update/delete lógico;
+- Season: create/update/delete lógico.
+
+Fora da allowlist inicial:
+
+- financeiro completo;
+- telemetria histórica em massa;
+- raster/GeoTIFF/COG;
+- tiles/mapas em massa;
+- documentos pesados;
+- modelos de Intelligence;
+- PostgreSQL local;
+- sidecars C#/Python/Java.
+
+## Bootstrap
+
+Endpoints:
 
 ```text
-agrocontrol.offline
+GET /api/v1/sync/status?farmId=...
+GET /api/v1/sync/bootstrap?farmId=...
 ```
 
-Schema local inicial: `1`.
+O bootstrap é opt-in e limitado a uma única fazenda acessível.
 
-Stores:
+Limites:
 
-- `records`;
-- `outbox`;
-- `syncMetadata`.
+- até 2.000 Fields;
+- até 10.000 Seasons;
+- até 1.000 Crops referenciados.
 
-### records
+Usuário com `AllFarms` não recebe download global implícito.
 
-Metadata principal:
+O snapshot é gravado atomicamente no IndexedDB. Se houver outbox pendente, o bootstrap é bloqueado para evitar perda de trabalho offline.
 
-- `namespaceKey`;
-- `entityKind`;
-- `entityId`;
-- `data`;
-- `serverVersion`;
-- `updatedAtUtc`;
-- `syncState`;
-- `lastSyncedAtUtc`;
-- snapshot de conflito quando necessário.
+## Pull incremental
 
-Estados:
+Endpoint:
+
+```text
+GET /api/v1/sync/pull?farmId=...&cursor=...
+```
+
+Características:
+
+- change-log PostgreSQL append-only e monotônico;
+- triggers na mesma transação das alterações de negócio;
+- cursor opaco e autenticado server-side;
+- cursor vinculado à organização e fazenda;
+- validade limitada;
+- até 500 mudanças por página;
+- segunda validação de pertencimento ao materializar entidades;
+- Field movido de Farm A para Farm B gera remoção no escopo antigo sem vazar payload da nova fazenda.
+
+O watermark do bootstrap é capturado antes da leitura do snapshot; mudanças concorrentes durante o bootstrap aparecem no pull seguinte.
+
+## Push idempotente
+
+Endpoint:
+
+```text
+POST /api/v1/sync/push
+```
+
+Características:
+
+- até 100 operações por lote;
+- `operationId` UUID gerado no cliente;
+- IDs estáveis de entidades criadas offline;
+- idempotência persistida por `OrganizationId + UserId + operationId`;
+- hash canônico da operação;
+- retenção de 30 dias;
+- replay do mesmo conteúdo retorna o resultado persistido;
+- reutilização do mesmo `operationId` com conteúdo diferente é rejeitada;
+- efeito de negócio e resultado idempotente usam a mesma transação PostgreSQL;
+- update/delete usam `FOR UPDATE`;
+- `serverVersion` usa UTC com precisão compatível com PostgreSQL.
+
+## Outbox e staging
+
+Toda mutação offline é gravada atomicamente como:
+
+```text
+registro local + operação de outbox
+```
+
+Estados de mutação:
+
+```text
+Pending
+Retryable
+Conflict
+Failed
+```
+
+Estados de registro:
 
 ```text
 Clean
@@ -100,250 +157,47 @@ Conflict
 Failed
 ```
 
-### outbox
+O cliente não permite duas mutações pendentes concorrentes sobre a mesma entidade.
 
-Cada intenção local contém:
+## Conflitos
 
-- `operationId` UUID;
-- namespace;
-- entidade/ID;
-- `create | update | delete`;
-- payload mínimo;
-- `baseServerVersion`;
-- instante de criação;
-- tentativas;
-- estado;
-- último erro.
+Não existe last-write-wins silencioso.
 
-Estados:
+Quando `BaseServerVersion` não corresponde ao estado atual:
 
-```text
-Pending
-Retryable
-Conflict
-Failed
-```
+- backend retorna `Conflict`;
+- cliente mantém a proposta local;
+- snapshot atual do servidor é preservado;
+- usuário pode escolher `Usar servidor`;
+- ou `Reaplicar minha alteração` com a versão atual e um novo `operationId`.
 
-O staging de `record + mutation` ocorre na mesma transação IndexedDB. Uma entidade não aceita uma segunda mutação enquanto a anterior não for sincronizada/resolvida.
+## Retry e reconexão
 
-### syncMetadata
-
-Por namespace:
-
-- cursor;
-- última sincronização;
-- estado de preparação;
-- schema local;
-- último erro.
-
-Estados de preparação:
+Fluxo do sync engine:
 
 ```text
-NotPrepared
-Preparing
-Ready
-Blocked
-Error
+push -> resolver pendências -> pull incremental
 ```
 
-## Allowlist inicial
+O pull só ocorre quando a outbox não possui operação enviável, conflito ou rejeição pendente.
 
-Snapshot offline:
-
-- Farm selecionada;
-- Fields da farm;
-- Crops referenciados pelas Seasons;
-- Seasons da farm.
-
-Mutações:
-
-- Field create/update/delete lógico;
-- Season create/update/delete lógico.
-
-Fora da allowlist automática:
-
-- financeiro completo;
-- telemetria histórica em massa;
-- raster/GeoTIFF/COG;
-- tiles/mapas em massa;
-- documentos pesados;
-- secrets;
-- banco PostgreSQL local.
-
-## API
-
-```text
-GET  /api/v1/sync/status?farmId=...
-GET  /api/v1/sync/bootstrap?farmId=...
-GET  /api/v1/sync/pull?farmId=...&cursor=...
-POST /api/v1/sync/push
-```
-
-Todos os endpoints exigem autenticação e entitlement de Farms.
-
-## Bootstrap
-
-Fluxo:
-
-1. revalida `FarmAccessScope`;
-2. valida farm ativa dentro do tenant;
-3. captura watermark atual do change-log;
-4. emite cursor protegido;
-5. carrega somente dados da fazenda escolhida;
-6. crops são incluídos apenas quando referenciados;
-7. frontend revalida relações e namespace;
-8. snapshot limpo substitui o anterior atomicamente somente se não houver outbox pendente.
-
-Limites:
-
-- 2.000 Fields;
-- 10.000 Seasons;
-- 1.000 Crops referenciados.
-
-## Change-log e pull incremental
-
-O servidor mantém sequência monotônica de alterações farm-scoped.
-
-O cursor é opaco/protegido e carrega contexto suficiente para impedir reutilização em outra organização/fazenda.
-
-Pull:
-
-- máximo de 500 mudanças por página;
-- `hasMore` explícito;
-- cursor avança pela sequência efetivamente varrida;
-- entidade que saiu da farm é materializada como delete no escopo antigo, sem vazar o payload atual;
-- mudanças desconhecidas não são promovidas automaticamente à allowlist.
-
-## Push
-
-Máximo: **100 operações por lote**.
-
-Validações do lote:
-
-- FarmId obrigatório;
-- 1–100 operações;
-- operationId/entityId não vazios;
-- operationId não duplicado no mesmo lote.
-
-Para cada operação:
-
-1. revalida acesso à farm;
-2. valida entity kind/operation allowlisted;
-3. calcula hash canônico da intenção;
-4. tenta claim idempotente;
-5. replaya resultado anterior quando hash coincide;
-6. update/delete obtêm row lock `FOR UPDATE`;
-7. compara versão-base;
-8. executa regra de domínio;
-9. armazena resultado;
-10. efeito + resultado idempotente commitam juntos.
-
-Resultados possíveis:
-
-```text
-Applied
-RetryableError
-Forbidden
-ValidationError
-Conflict
-NotFound
-```
-
-## Idempotência
-
-Chave persistida:
-
-```text
-OrganizationId + UserId + operationId
-```
-
-Retenção: **30 dias**.
-
-O resultado é armazenado em JSONB. Repetir a mesma operação retorna o resultado anterior com `Replayed=true`.
-
-Reusar o mesmo `operationId` com conteúdo diferente retorna `OperationIdReuse`; isso não é tratado como conflito de versão de negócio.
-
-## Concorrência
-
-`baseServerVersion` é comparada ao `UpdatedAtUtc` bloqueado no banco.
-
-Field/Season geram timestamps UTC normalizados à precisão de microssegundos do PostgreSQL para impedir falsos conflitos após ACK.
-
-Conflito de versão retorna versão/snapshot atuais quando seguro.
-
-## Resolução de conflito no cliente
-
-O frontend mantém:
-
-- proposta local;
-- versão atual do servidor;
-- snapshot atual do servidor;
-- motivo.
-
-Ações:
-
-### Usar servidor
-
-Descarta a intenção local e substitui o registro pelo snapshot confirmado.
-
-### Reaplicar minha alteração
-
-- preserva a proposta;
-- usa a versão atual do servidor como nova base;
-- gera **novo `operationId`**;
-- volta para `Pending`.
-
-Create conflict não é reaplicado automaticamente sem revisão.
-
-## Retry / ACK perdido
-
-- exceção de transporte mantém mutação em `Retryable`;
-- ausência de ACK mantém mutação em `Retryable`;
-- backend retorna `RetryableError` quando a transação não foi commitada;
-- a engine usa backoff exponencial limitado dentro de uma execução;
-- reconexão dispara sync automático com debounce;
-- um `operationId` reapresentado após ACK perdido não duplica efeito.
-
-Pull só roda quando não existem mutações enviáveis, conflicts ou failed pendentes.
-
-## Lote parcialmente rejeitado
-
-Cada operação é transacionada/idempotente de forma independente dentro do batch. Uma operação válida pode receber `Applied` mesmo quando outra retorna Validation/Conflict/Forbidden.
-
-ACK confirmado não é perdido por erro posterior do lote.
+Falhas transitórias permanecem em `Retryable`. O motor aplica backoff exponencial limitado e também tenta sincronizar após a recuperação da conexão.
 
 ## Revogação de acesso
 
-Cenário obrigatório implementado/testado:
+`FarmAccessScope` é revalidado no início da sincronização e antes de cada operação do lote.
 
-1. usuário tem acesso à Farm A;
-2. prepara/trabalha offline;
-3. acesso é removido;
-4. sincronização começa;
-5. backend pode aceitar uma operação que passou antes da revogação;
-6. revalidação anterior à operação seguinte detecta a remoção;
-7. operação posterior recebe `FarmAccessRevoked`;
-8. cliente purga records/outbox da farm e mantém metadata `Blocked`.
+Se o acesso for removido durante o período offline ou no meio de um lote:
 
-`401`, `403` e `404` durante sync também acionam política conservadora de bloqueio/purge da cópia local daquele namespace.
+- ACKs já confirmados permanecem válidos;
+- operações posteriores são bloqueadas;
+- records/outbox da fazenda são removidos do cliente;
+- fica apenas metadata `Blocked` com o motivo;
+- nova sincronização exige autorização/preparação válida.
 
-## Logout e troca de usuário
+`401`, `403` e `404` durante o fluxo usam política conservadora de bloqueio/purge.
 
-- logout explícito limpa material offline;
-- login de usuário/organização diferente limpa o contexto anterior;
-- reiniciar e entrar novamente com o mesmo usuário preserva a cópia offline válida;
-- JWT continua somente na camada de sessão, não no IndexedDB offline.
-
-## Segurança horizontal
-
-Cobertura inclui:
-
-- cross-farm na mesma organização;
-- tentativa de payload mover Field para outra farm;
-- Season apontando para Field de outra farm;
-- Organização A tentando usar Farm da Organização B;
-- cursor de outra farm;
-- revalidação por operação durante o lote.
+Logout explícito e troca de usuário/organização também limpam material local do contexto anterior. Novo login do mesmo usuário pode preservar uma cópia ainda válida conforme a política implementada.
 
 ## UX
 
@@ -353,22 +207,18 @@ Rota:
 /offline
 ```
 
-A tela oferece:
+A interface permite:
 
-- escolha explícita de farm;
+- selecionar explicitamente a fazenda;
 - `Disponibilizar offline`;
-- remover cópia;
-- sync manual;
-- sync ao reconectar;
-- indicador Online/Offline;
-- última sincronização;
-- contagem de pendências;
-- conflitos;
-- rejeições;
-- CRUD local allowlisted de Fields/Seasons;
-- resolução explícita de conflitos.
-
-O sistema não comunica `Synced` quando existe outbox pendente, conflito ou rejeição.
+- remover a cópia local;
+- sincronizar manualmente;
+- sincronizar ao reconectar;
+- visualizar estado online/offline;
+- visualizar última sincronização;
+- ver pendências, conflitos e rejeições;
+- criar/editar/desativar Fields e Seasons offline;
+- resolver conflitos explicitamente.
 
 ## Observabilidade
 
@@ -378,67 +228,74 @@ Meter:
 AgroControl.OfflineSync
 ```
 
-Métricas:
+Métricas cobrem:
 
-```text
-agrocontrol.sync.batches
-agrocontrol.sync.operations
-agrocontrol.sync.retries
-agrocontrol.sync.invalid_cursors
-agrocontrol.sync.access_revocations
-agrocontrol.sync.duration
-agrocontrol.sync.batch_size
-```
+- batches push/pull;
+- latência;
+- tamanho de lote;
+- operações por resultado;
+- retries;
+- cursores inválidos/expirados;
+- revogação de acesso.
 
-Labels permitidas são de baixa cardinalidade (`direction`, `outcome`, `entity`, `replayed`).
+`UserId`, `FarmId` e `operationId` não são usados como labels.
 
-Nunca usar `UserId`, `FarmId` ou `operationId` como labels.
+## Segurança
 
-## Testes
+- JWT continua em sessão, não no OfflineStore;
+- nenhuma autorização depende do frontend;
+- push e pull revalidam escopo no servidor;
+- operação não pode escolher arbitrariamente outro tenant;
+- payload cross-farm é rejeitado;
+- cursor não amplia escopo;
+- lote e bootstrap possuem limites explícitos;
+- service worker não cacheia dados autenticados;
+- Desktop Tauri mantém superfície nativa mínima.
 
-Backend:
+## Testes de fechamento
 
-- bootstrap por farm;
-- farm fora de escopo;
-- crop referenciado ausente;
-- cursor válido/adulterado/expirado/outra farm;
-- change-log farm-scoped;
-- Field movido entre farms;
-- idempotency claim/replay/rollback;
+O head final do PR #60 passou pelos cinco gates no mesmo SHA:
+
+- Backend CI ✅
+- Frontend CI ✅
+- Platform CI ✅
+- Desktop CI ✅
+- CodeQL ✅
+
+Backend no gate final:
+
+- 88 testes unitários passando;
+- 29 testes de integração passando;
+- 0 warnings;
+- 0 errors.
+
+Frontend no gate final:
+
+- 45 testes passando;
+- typecheck;
+- build de produção;
+- verificação PWA;
+- imagem Docker;
+- smoke test.
+
+Cobertura relevante inclui:
+
+- bootstrap e isolamento por fazenda;
+- cursor inválido/expirado;
+- Field movido entre fazendas;
+- idempotência e rollback;
 - create + replay sem duplicação;
-- stale version → Conflict;
+- stale version/conflict;
 - lote parcialmente rejeitado;
 - cross-farm;
+- cross-organization;
 - revogação no meio do lote;
-- cross-organization.
+- ACK/retry/conflict/purge no cliente.
 
-Frontend:
+## Fechamento
 
-- namespace/chave composta;
-- validação de persistência;
-- bootstrap e relações;
-- pull incremental/ordenação/cross-farm;
-- ACK Applied;
-- falha de rede → Retryable;
-- conflito com snapshot;
-- revogação → purge/Blocked;
-- cálculo do backoff.
-
-## Migrations
-
-```text
-20260909010000_OfflineSyncChangeLog
-20260909013000_OfflineSyncIdempotency
-```
-
-## Gate final
-
-A Sprint 21 só é considerada encerrada depois de, no mesmo head final:
-
-- Backend CI verde;
-- Frontend CI verde;
-- Platform CI verde;
-- Desktop CI verde;
-- CodeQL verde;
-- PR #60 fora de draft e squash merged;
-- Issue #59 encerrada como `completed`.
+- API `0.21.0`;
+- Desktop `0.21.0` após o ajuste final de consistência de release;
+- PR #60 squash merged;
+- Issue #59 completed;
+- Sprint 21 concluída.
