@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ModulePage } from './pages/ModulePage';
 import { ModulesPage } from './pages/ModulesPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { OfflinePage } from './pages/OfflinePage';
 import { PrecisionAgriculturePage } from './pages/PrecisionAgriculturePage';
 import { RemoteSensingPage } from './pages/RemoteSensingPage';
 import { SceneDiscoveryPage } from './pages/SceneDiscoveryPage';
@@ -38,6 +39,7 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<DashboardPage />} />
           <Route path="production" element={<ProductionPage />} />
+          <Route path="offline" element={<OfflinePage />} />
           <Route path="precision" element={<PrecisionAgriculturePage />} />
           <Route path="precision/remote-sensing" element={<RemoteSensingPage />} />
           <Route path="precision/remote-sensing/discovery" element={<SceneDiscoveryPage />} />
