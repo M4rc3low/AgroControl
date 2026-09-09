@@ -31,10 +31,21 @@ public sealed class Field
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime UpdatedAtUtc { get; private set; }
 
-    public static Field Create(Guid organizationId, Guid farmId, string name, decimal areaHectares, DateTime nowUtc)
+    public static Field Create(Guid organizationId, Guid farmId, string name, decimal areaHectares, DateTime nowUtc) =>
+        CreateWithId(Guid.NewGuid(), organizationId, farmId, name, areaHectares, nowUtc);
+
+    public static Field CreateWithId(
+        Guid id,
+        Guid organizationId,
+        Guid farmId,
+        string name,
+        decimal areaHectares,
+        DateTime nowUtc)
     {
+        if (id == Guid.Empty)
+            throw new ArgumentException("Field id is required.", nameof(id));
         Validate(farmId, name, areaHectares);
-        return new Field(Guid.NewGuid(), organizationId, farmId, name.Trim(), areaHectares, nowUtc);
+        return new Field(id, organizationId, farmId, name.Trim(), areaHectares, nowUtc);
     }
 
     public void Update(Guid farmId, string name, decimal areaHectares, DateTime nowUtc)
