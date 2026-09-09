@@ -100,7 +100,7 @@ public sealed class OfflineSyncIdempotencyPersistenceTests
         var now = DateTime.UtcNow;
         const string requestHash = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => transaction.ExecuteAsync(async ct =>
+        await Assert.ThrowsAsync<InvalidOperationException>(() => transaction.ExecuteAsync<bool>(async ct =>
         {
             var claimed = await repository.TryClaimAsync(
                 organizationId,
