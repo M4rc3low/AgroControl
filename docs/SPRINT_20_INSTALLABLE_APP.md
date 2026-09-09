@@ -41,12 +41,14 @@ O desktop **não** embute API C#, PostgreSQL/PostGIS, Python Intelligence, Java 
 A PWA adiciona:
 
 - `manifest.webmanifest`;
-- ícones 192x192 e 512x512;
+- fonte vetorial canônica `public/icons/agrocontrol.svg` declarada para os tamanhos de instalação 192x192 e 512x512;
 - `display: standalone`;
 - service worker;
 - cache somente do app shell e assets estáticos;
 - fallback do `index.html` para abrir a interface sem conexão;
 - aviso visual quando o navegador perde conectividade.
+
+Os antigos PNGs gerados durante a implementação inicial foram removidos depois que o build detectou arquivos truncados. O SVG é a única fonte canônica; formatos nativos são derivados dele pelo Tauri CLI.
 
 ### Limite de offline nesta sprint
 
@@ -72,7 +74,7 @@ Estrutura:
 ```text
 src/frontend/
 ├── src/                 # React compartilhado
-├── public/              # manifest, service worker e ícones PWA
+├── public/              # manifest, service worker e fonte canônica dos ícones
 ├── dist/                # build Web compartilhado
 └── src-tauri/           # shell nativo mínimo
     ├── Cargo.toml
@@ -80,6 +82,8 @@ src/frontend/
     ├── tauri.conf.json
     └── src/
 ```
+
+Antes de `desktop:dev` e `desktop:build`, o Tauri CLI gera PNG/ICO/ICNS nativos a partir de `public/icons/agrocontrol.svg`. O CI usa a mesma fonte e o mesmo processo, evitando ícones binários artesanais no repositório.
 
 ### Superfície nativa inicial
 
@@ -166,7 +170,7 @@ Gates da Sprint 20:
 - Platform CI;
 - CodeQL.
 
-`Frontend CI` verifica a existência do manifest, service worker e ícones. `Desktop CI` compila os installers Windows a partir do mesmo frontend.
+`Frontend CI` verifica manifest, service worker e SVG canônico. `Desktop CI` gera os ícones nativos a partir do SVG e compila os installers Windows usando o mesmo frontend.
 
 ## Fora do escopo
 
