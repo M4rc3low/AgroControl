@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AgroControl">
+  <rect width="512" height="512" rx="112" fill="#163f35"/>
+  <path fill="#f4f7f4" d="M256 104c-73 25-126 89-126 165 0 79 57 139 126 139s126-60 126-139c0-76-53-140-126-165Zm0 62c36 17 62 50 69 90-25-14-48-20-69-20-22 0-45 6-69 20 7-40 33-73 69-90Zm-70 143c27-17 50-25 70-25s43 8 70 25c-15 27-39 45-70 45s-55-18-70-45Z"/>
+  <path d="M256 196v158M206 249c17 8 34 20 50 36 16-16 33-28 50-36" fill="none" stroke="#8fc47d" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
