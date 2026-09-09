@@ -154,6 +154,69 @@ public sealed class OfflinePushIntegrationTests
         Assert.False(await fixture.Db.Fields.IgnoreQueryFilters().AnyAsync(field => field.Id == fieldId));
     }
 
+    [Fact]
+    public async Task Access_revoked_mid_batch_keeps_first_ack_and_blocks_later_operation()
+    {
+        var scope = new CountingFarmScope(allowedCalls: 3);
+        await using var fixture = await Fixture.CreateAsync(scope);
+        if (!fixture.Available) return;
+
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var request = new OfflinePushRequestDto(fixture.Farm.Id,
+        [
+            new OfflinePushOperationDto(
+                Guid.NewGuid(), "field", firstId, "create", null,
+                JsonSerializer.SerializeToElement(new { farmId = fixture.Farm.Id, name = "Primeiro", areaHectares = 10m })),
+            new OfflinePushOperationDto(
+                Guid.NewGuid(), "field", secondId, "create", null,
+                JsonSerializer.SerializeToElement(new { farmId = fixture.Farm.Id, name = "Segundo", areaHectares = 10m }))
+        ]);
+
+        var result = await fixture.Push.PushAsync(fixture.Organization.Id, fixture.UserId, request);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Applied", result.Value!.Results[0].Status);
+        Assert.Equal("Forbidden", result.Value.Results[1].Status);
+        Assert.Equal("FarmAccessRevoked", result.Value.Results[1].ErrorCode);
+        Assert.True(await fixture.Db.Fields.IgnoreQueryFilters().AnyAsync(field => field.Id == firstId));
+        Assert.False(await fixture.Db.Fields.IgnoreQueryFilters().AnyAsync(field => field.Id == secondId));
+    }
+
+    [Fact]
+    public async Task Push_cannot_cross_organization_boundary_even_when_access_scope_claims_allowance()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        if (!fixture.Available) return;
+
+        var now = DatabaseTimestamp.UtcNow();
+        var otherOrganization = Organization.Create("Outra organização", $"other-{Guid.NewGuid():N}", now);
+        var otherFarm = Farm.Create(otherOrganization.Id, "Fazenda Externa", 100m, "Goiânia", "GO", now);
+        fixture.Db.Organizations.Add(otherOrganization);
+        fixture.Db.Farms.Add(otherFarm);
+        await fixture.Db.SaveChangesAsync();
+
+        var fieldId = Guid.NewGuid();
+        var request = new OfflinePushRequestDto(otherFarm.Id, [new OfflinePushOperationDto(
+            Guid.NewGuid(),
+            "field",
+            fieldId,
+            "create",
+            null,
+            JsonSerializer.SerializeToElement(new
+            {
+                farmId = otherFarm.Id,
+                name = "Tentativa cross-tenant",
+                areaHectares = 10m
+            }))]);
+
+        var result = await fixture.Push.PushAsync(fixture.Organization.Id, fixture.UserId, request);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(OperationErrorKind.NotFound, result.ErrorKind);
+        Assert.False(await fixture.Db.Fields.IgnoreQueryFilters().AnyAsync(field => field.Id == fieldId));
+    }
+
     private sealed class AllowFarmScope : IFarmAccessScope
     {
         public Task<FarmAccessScopeSnapshot> GetEffectiveScopeAsync(
@@ -167,6 +230,24 @@ public sealed class OfflinePushIntegrationTests
             Guid userId,
             Guid farmId,
             CancellationToken cancellationToken = default) => Task.FromResult(true);
+    }
+
+    private sealed class CountingFarmScope(int allowedCalls) : IFarmAccessScope
+    {
+        private int calls;
+
+        public Task<FarmAccessScopeSnapshot> GetEffectiveScopeAsync(
+            Guid organizationId,
+            Guid userId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new FarmAccessScopeSnapshot(false, [], []));
+
+        public Task<bool> CanAccessFarmAsync(
+            Guid organizationId,
+            Guid userId,
+            Guid farmId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Interlocked.Increment(ref calls) <= allowedCalls);
     }
 
     private sealed class Fixture : IAsyncDisposable
@@ -188,7 +269,7 @@ public sealed class OfflinePushIntegrationTests
         public Guid UserId { get; }
         public OfflinePushService Push { get; }
 
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(IFarmAccessScope? accessScope = null)
         {
             var connectionString = Environment.GetEnvironmentVariable("AGROCONTROL_TEST_CONNECTION_STRING");
             var options = new DbContextOptionsBuilder<AgroControlDbContext>()
@@ -210,7 +291,7 @@ public sealed class OfflinePushIntegrationTests
             await db.SaveChangesAsync();
 
             var repository = new ProductionRepository(db);
-            var access = new AllowFarmScope();
+            var access = accessScope ?? new AllowFarmScope();
             var unitOfWork = new UnitOfWork(db);
             var fieldService = new FieldService(repository, access, unitOfWork);
             var seasonService = new SeasonService(repository, access, unitOfWork);
