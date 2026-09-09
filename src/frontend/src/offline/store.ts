@@ -26,5 +26,13 @@ export interface OfflineStore {
     records: OfflineRecord[],
     metadata: OfflineSyncMetadata
   ): Promise<void>;
+
+  applyCleanServerChanges(
+    namespaceKey: string,
+    upserts: OfflineRecord[],
+    deleteKeys: string[],
+    metadata: OfflineSyncMetadata
+  ): Promise<void>;
+
   clearNamespace(namespaceKey: string): Promise<void>;
 }
