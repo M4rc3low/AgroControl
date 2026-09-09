@@ -67,6 +67,9 @@ async function applyAck(
 ) {
   const key = createOfflineRecordKey(namespace, mutation.entityKind, mutation.entityId);
   const current = await store.getRecord(key);
+  if (!current) {
+    throw new Error('Server acknowledged a mutation whose local record was unexpectedly missing.');
+  }
 
   if (result.serverEntity === null || result.serverEntity === undefined) {
     await store.deleteRecord(key);
@@ -90,10 +93,6 @@ async function applyAck(
   };
   await store.putRecord(clean);
   await store.deleteMutation(mutation.operationId);
-
-  if (!current && mutation.operation !== 'create') {
-    throw new Error('Server acknowledged a mutation whose local record was unexpectedly missing.');
-  }
 }
 
 async function applyConflict(
@@ -192,7 +191,7 @@ export async function pushFarmOffline(
       })
     });
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
       const reason = error.message || 'Offline farm access is no longer available.';
       await store.blockAndPurgeNamespace(namespaceKey, reason);
       return {
@@ -250,7 +249,7 @@ export async function pushFarmOffline(
       retryable += 1;
       continue;
     }
-    if (result.status === 'Conflict') {
+    if (result.status === 'Conflict' && result.errorCode !== 'OperationIdReuse') {
       await applyConflict(namespace, mutation, result, store);
       conflicts += 1;
       continue;
