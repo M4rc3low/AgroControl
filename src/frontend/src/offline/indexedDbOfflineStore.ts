@@ -183,6 +183,64 @@ export class IndexedDbOfflineStore implements OfflineStore {
     await transactionToPromise(transaction);
   }
 
+  async applyCleanServerChanges(
+    namespaceKey: string,
+    upserts: OfflineRecord[],
+    deleteKeys: string[],
+    metadata: OfflineSyncMetadata
+  ) {
+    if (!namespaceKey.trim()) throw new Error('namespaceKey is required for offline pull.');
+    assertOfflineSyncMetadata(metadata);
+    if (metadata.namespaceKey !== namespaceKey) {
+      throw new Error('Offline pull metadata does not match the target namespace.');
+    }
+
+    const namespacePrefix = `${namespaceKey}|`;
+    const seenKeys = new Set<string>();
+    for (const record of upserts) {
+      assertOfflineRecord(record);
+      if (record.namespaceKey !== namespaceKey || !record.key.startsWith(namespacePrefix)) {
+        throw new Error('Offline pull contains an upsert from another namespace.');
+      }
+      if (record.syncState !== 'Clean') {
+        throw new Error('Offline pull can only apply clean server records.');
+      }
+      if (seenKeys.has(record.key)) {
+        throw new Error('Offline pull contains duplicate upsert keys.');
+      }
+      seenKeys.add(record.key);
+    }
+
+    for (const key of deleteKeys) {
+      if (!key.startsWith(namespacePrefix)) {
+        throw new Error('Offline pull contains a delete key from another namespace.');
+      }
+      if (seenKeys.has(key)) {
+        throw new Error('Offline pull cannot upsert and delete the same record in one batch.');
+      }
+      seenKeys.add(key);
+    }
+
+    const db = await this.getDb();
+    const transaction = db.transaction(
+      [RECORDS_STORE, OUTBOX_STORE, SYNC_METADATA_STORE],
+      'readwrite'
+    );
+    const pendingCount = await requestToPromise(
+      transaction.objectStore(OUTBOX_STORE).index(NAMESPACE_INDEX).count(IDBKeyRange.only(namespaceKey))
+    );
+    if (pendingCount > 0) {
+      transaction.abort();
+      throw new Error('Offline pull cannot overwrite a namespace with pending local mutations. Push local changes first.');
+    }
+
+    const recordsStore = transaction.objectStore(RECORDS_STORE);
+    for (const key of deleteKeys) recordsStore.delete(key);
+    for (const record of upserts) recordsStore.put(record);
+    transaction.objectStore(SYNC_METADATA_STORE).put(metadata);
+    await transactionToPromise(transaction);
+  }
+
   async clearNamespace(namespaceKey: string) {
     const db = await this.getDb();
     const transaction = db.transaction([RECORDS_STORE, OUTBOX_STORE, SYNC_METADATA_STORE], 'readwrite');
