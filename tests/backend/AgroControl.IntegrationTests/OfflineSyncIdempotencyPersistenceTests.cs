@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AgroControl.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,7 +75,11 @@ public sealed class OfflineSyncIdempotencyPersistenceTests
         Assert.NotNull(stored);
         Assert.Equal("completed", stored.Status);
         Assert.Equal(requestHash, stored.RequestHash);
-        Assert.Equal(resultJson, stored.ResultJson);
+        Assert.False(string.IsNullOrWhiteSpace(stored.ResultJson));
+
+        using var persisted = JsonDocument.Parse(stored.ResultJson!);
+        Assert.Equal("00000000-0000-0000-0000-000000000001", persisted.RootElement.GetProperty("operationId").GetString());
+        Assert.Equal("Applied", persisted.RootElement.GetProperty("status").GetString());
     }
 
     [Fact]
