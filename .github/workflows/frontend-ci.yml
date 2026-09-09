@@ -49,9 +49,10 @@ jobs:
           set -euo pipefail
           test -f dist/manifest.webmanifest
           test -f dist/sw.js
-          test -f dist/icons/icon-192.png
-          test -f dist/icons/icon-512.png
+          test -f dist/icons/agrocontrol.svg
           grep -q '"display": "standalone"' dist/manifest.webmanifest
+          grep -q '"sizes": "192x192"' dist/manifest.webmanifest
+          grep -q '"sizes": "512x512"' dist/manifest.webmanifest
           grep -q "url.pathname.startsWith('/api/')" dist/sw.js
 
       - name: Build container image
