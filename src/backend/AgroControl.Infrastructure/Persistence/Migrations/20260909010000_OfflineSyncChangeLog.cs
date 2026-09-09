@@ -67,6 +67,36 @@ public sealed class OfflineSyncChangeLog : Migration
                     RETURN OLD;
                 END IF;
 
+                IF TG_OP = 'UPDATE' AND OLD."FarmId" IS DISTINCT FROM NEW."FarmId" THEN
+                    INSERT INTO offline_sync_changes
+                        (organization_id, farm_id, entity_kind, entity_id, change_type)
+                    VALUES
+                        (OLD."OrganizationId", OLD."FarmId", 'field', OLD."Id", 'delete');
+
+                    INSERT INTO offline_sync_changes
+                        (organization_id, farm_id, entity_kind, entity_id, change_type)
+                    SELECT
+                        OLD."OrganizationId", OLD."FarmId", 'season', season."Id", 'delete'
+                    FROM seasons AS season
+                    WHERE season."OrganizationId" = OLD."OrganizationId"
+                      AND season."FieldId" = OLD."Id";
+
+                    INSERT INTO offline_sync_changes
+                        (organization_id, farm_id, entity_kind, entity_id, change_type)
+                    VALUES
+                        (NEW."OrganizationId", NEW."FarmId", 'field', NEW."Id", 'upsert');
+
+                    INSERT INTO offline_sync_changes
+                        (organization_id, farm_id, entity_kind, entity_id, change_type)
+                    SELECT
+                        NEW."OrganizationId", NEW."FarmId", 'season', season."Id", 'upsert'
+                    FROM seasons AS season
+                    WHERE season."OrganizationId" = NEW."OrganizationId"
+                      AND season."FieldId" = NEW."Id";
+
+                    RETURN NEW;
+                END IF;
+
                 INSERT INTO offline_sync_changes
                     (organization_id, farm_id, entity_kind, entity_id, change_type)
                 VALUES
@@ -86,43 +116,60 @@ public sealed class OfflineSyncChangeLog : Migration
             CREATE OR REPLACE FUNCTION agrocontrol_log_season_sync_change()
             RETURNS trigger AS $$
             DECLARE
-                resolved_farm_id uuid;
-                resolved_org_id uuid;
-                resolved_field_id uuid;
-                resolved_entity_id uuid;
+                old_farm_id uuid;
+                new_farm_id uuid;
             BEGIN
                 IF TG_OP = 'DELETE' THEN
-                    resolved_org_id := OLD."OrganizationId";
-                    resolved_field_id := OLD."FieldId";
-                    resolved_entity_id := OLD."Id";
-                ELSE
-                    resolved_org_id := NEW."OrganizationId";
-                    resolved_field_id := NEW."FieldId";
-                    resolved_entity_id := NEW."Id";
+                    SELECT "FarmId"
+                      INTO old_farm_id
+                      FROM fields
+                     WHERE "OrganizationId" = OLD."OrganizationId"
+                       AND "Id" = OLD."FieldId";
+
+                    IF old_farm_id IS NULL THEN
+                        RAISE EXCEPTION 'Cannot resolve farm for deleted season %', OLD."Id";
+                    END IF;
+
+                    INSERT INTO offline_sync_changes
+                        (organization_id, farm_id, entity_kind, entity_id, change_type)
+                    VALUES
+                        (OLD."OrganizationId", old_farm_id, 'season', OLD."Id", 'delete');
+                    RETURN OLD;
                 END IF;
 
                 SELECT "FarmId"
-                  INTO resolved_farm_id
+                  INTO new_farm_id
                   FROM fields
-                 WHERE "OrganizationId" = resolved_org_id
-                   AND "Id" = resolved_field_id;
+                 WHERE "OrganizationId" = NEW."OrganizationId"
+                   AND "Id" = NEW."FieldId";
 
-                IF resolved_farm_id IS NULL THEN
-                    RAISE EXCEPTION 'Cannot resolve farm for season %', resolved_entity_id;
+                IF new_farm_id IS NULL THEN
+                    RAISE EXCEPTION 'Cannot resolve farm for season %', NEW."Id";
+                END IF;
+
+                IF TG_OP = 'UPDATE' THEN
+                    SELECT "FarmId"
+                      INTO old_farm_id
+                      FROM fields
+                     WHERE "OrganizationId" = OLD."OrganizationId"
+                       AND "Id" = OLD."FieldId";
+
+                    IF old_farm_id IS NULL THEN
+                        RAISE EXCEPTION 'Cannot resolve previous farm for season %', OLD."Id";
+                    END IF;
+
+                    IF old_farm_id IS DISTINCT FROM new_farm_id THEN
+                        INSERT INTO offline_sync_changes
+                            (organization_id, farm_id, entity_kind, entity_id, change_type)
+                        VALUES
+                            (OLD."OrganizationId", old_farm_id, 'season', OLD."Id", 'delete');
+                    END IF;
                 END IF;
 
                 INSERT INTO offline_sync_changes
                     (organization_id, farm_id, entity_kind, entity_id, change_type)
                 VALUES
-                    (
-                        resolved_org_id,
-                        resolved_farm_id,
-                        'season',
-                        resolved_entity_id,
-                        CASE WHEN TG_OP = 'DELETE' THEN 'delete' ELSE 'upsert' END
-                    );
-
-                IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+                    (NEW."OrganizationId", new_farm_id, 'season', NEW."Id", 'upsert');
                 RETURN NEW;
             END;
             $$ LANGUAGE plpgsql;
