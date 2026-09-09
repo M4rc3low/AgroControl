@@ -54,14 +54,37 @@ public sealed class SeasonService(
         return ToDto(season);
     }
 
-    public async Task<OperationResult<SeasonDto>> CreateAsync(
+    public Task<OperationResult<SeasonDto>> CreateAsync(
         Guid organizationId,
         Guid userId,
         CreateSeasonCommand command,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(organizationId, userId, null, command, cancellationToken);
+
+    public Task<OperationResult<SeasonDto>> CreateWithIdAsync(
+        Guid organizationId,
+        Guid userId,
+        Guid id,
+        CreateSeasonCommand command,
+        CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(organizationId, userId, id, command, cancellationToken);
+
+    private async Task<OperationResult<SeasonDto>> CreateCoreAsync(
+        Guid organizationId,
+        Guid userId,
+        Guid? explicitId,
+        CreateSeasonCommand command,
+        CancellationToken cancellationToken)
     {
+        if (explicitId == Guid.Empty)
+            return OperationResult<SeasonDto>.Validation("Season id is required.");
+
         var validation = Validate(command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, null);
         if (validation is not null) return OperationResult<SeasonDto>.Validation(validation);
+
+        if (explicitId is not null &&
+            await repository.GetSeasonAsync(organizationId, explicitId.Value, false, cancellationToken) is not null)
+            return OperationResult<SeasonDto>.Conflict("Season id already exists.");
 
         var field = await repository.GetFieldAsync(organizationId, command.FieldId, false, cancellationToken);
         if (field is null || !field.IsActive || !await accessScope.CanAccessFarmAsync(organizationId, userId, field.FarmId, cancellationToken))
@@ -71,7 +94,10 @@ public sealed class SeasonService(
         if (crop is null || !crop.IsActive)
             return OperationResult<SeasonDto>.Validation("Crop does not exist or is inactive for this organization.");
 
-        var season = Season.Create(organizationId, command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, DateTime.UtcNow);
+        var nowUtc = DatabaseTimestamp.UtcNow();
+        var season = explicitId is null
+            ? Season.Create(organizationId, command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, nowUtc)
+            : Season.CreateWithId(explicitId.Value, organizationId, command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, nowUtc);
         repository.AddSeason(season);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<SeasonDto>.Success(ToDto(season));
@@ -102,7 +128,7 @@ public sealed class SeasonService(
         if (crop is null || !crop.IsActive)
             return OperationResult<SeasonDto>.Validation("Crop does not exist or is inactive for this organization.");
 
-        season.Update(command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, command.ActualYieldPerHectare, command.Status, DateTime.UtcNow);
+        season.Update(command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, command.ActualYieldPerHectare, command.Status, DatabaseTimestamp.UtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<SeasonDto>.Success(ToDto(season));
     }
@@ -119,7 +145,7 @@ public sealed class SeasonService(
         if (field is null || !await accessScope.CanAccessFarmAsync(organizationId, userId, field.FarmId, cancellationToken))
             return OperationResult<bool>.NotFound("Season not found.");
 
-        season.Deactivate(DateTime.UtcNow);
+        season.Deactivate(DatabaseTimestamp.UtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<bool>.Success(true);
     }

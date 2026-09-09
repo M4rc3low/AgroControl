@@ -46,14 +46,36 @@ public sealed class FieldService(
         return ToDto(field);
     }
 
-    public async Task<OperationResult<FieldDto>> CreateAsync(
+    public Task<OperationResult<FieldDto>> CreateAsync(
         Guid organizationId,
         Guid userId,
         CreateFieldCommand command,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(organizationId, userId, null, command, cancellationToken);
+
+    public Task<OperationResult<FieldDto>> CreateWithIdAsync(
+        Guid organizationId,
+        Guid userId,
+        Guid id,
+        CreateFieldCommand command,
+        CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(organizationId, userId, id, command, cancellationToken);
+
+    private async Task<OperationResult<FieldDto>> CreateCoreAsync(
+        Guid organizationId,
+        Guid userId,
+        Guid? explicitId,
+        CreateFieldCommand command,
+        CancellationToken cancellationToken)
     {
+        if (explicitId == Guid.Empty)
+            return OperationResult<FieldDto>.Validation("Field id is required.");
         if (string.IsNullOrWhiteSpace(command.Name) || command.AreaHectares <= 0)
             return OperationResult<FieldDto>.Validation("Name is required and areaHectares must be greater than zero.");
+
+        if (explicitId is not null &&
+            await repository.GetFieldAsync(organizationId, explicitId.Value, false, cancellationToken) is not null)
+            return OperationResult<FieldDto>.Conflict("Field id already exists.");
 
         if (!await accessScope.CanAccessFarmAsync(organizationId, userId, command.FarmId, cancellationToken))
             return OperationResult<FieldDto>.NotFound("Farm not found.");
@@ -66,7 +88,10 @@ public sealed class FieldService(
         if (allocatedArea + command.AreaHectares > farm.TotalAreaHectares)
             return OperationResult<FieldDto>.Validation("The sum of active field areas cannot be greater than the farm total area.");
 
-        var field = Field.Create(organizationId, command.FarmId, command.Name, command.AreaHectares, DateTime.UtcNow);
+        var nowUtc = DatabaseTimestamp.UtcNow();
+        var field = explicitId is null
+            ? Field.Create(organizationId, command.FarmId, command.Name, command.AreaHectares, nowUtc)
+            : Field.CreateWithId(explicitId.Value, organizationId, command.FarmId, command.Name, command.AreaHectares, nowUtc);
         repository.AddField(field);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<FieldDto>.Success(ToDto(field));
@@ -97,7 +122,7 @@ public sealed class FieldService(
         if (allocatedArea + command.AreaHectares > farm.TotalAreaHectares)
             return OperationResult<FieldDto>.Validation("The sum of active field areas cannot be greater than the farm total area.");
 
-        field.Update(command.FarmId, command.Name, command.AreaHectares, DateTime.UtcNow);
+        field.Update(command.FarmId, command.Name, command.AreaHectares, DatabaseTimestamp.UtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<FieldDto>.Success(ToDto(field));
     }
@@ -112,7 +137,7 @@ public sealed class FieldService(
         if (field is null || !await accessScope.CanAccessFarmAsync(organizationId, userId, field.FarmId, cancellationToken))
             return OperationResult<bool>.NotFound("Field not found.");
 
-        field.Deactivate(DateTime.UtcNow);
+        field.Deactivate(DatabaseTimestamp.UtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<bool>.Success(true);
     }

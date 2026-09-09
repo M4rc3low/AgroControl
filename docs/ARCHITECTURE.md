@@ -2,321 +2,334 @@
 
 ## 1. Visão geral
 
-O AgroControl adota um **monólito modular em C# / ASP.NET Core** como núcleo transacional, complementado por serviços especializados somente quando existe uma fronteira técnica clara.
+O AgroControl usa um **monólito modular em C# / ASP.NET Core** como núcleo transacional. Python/FastAPI concentra inteligência e processamento científico; Java/Spring Boot concentra telemetria/IoT; React/TypeScript é a interface canônica para navegador, PWA e Tauri Desktop.
 
-A interface canônica é uma única aplicação **React + TypeScript + Vite**, distribuída em três superfícies sem duplicação de produto:
-
-- navegador;
-- PWA instalável;
-- Desktop Windows via Tauri.
-
-Serviços da plataforma:
-
-- **AgroControl API** — ASP.NET Core / .NET;
-- **AgroControl Intelligence** — Python + FastAPI para modelagem e processamento científico;
-- **AgroControl Telemetry** — Java + Spring Boot para ingestão e histórico de telemetria;
-- **PostgreSQL + PostGIS** — persistência principal e dados espaciais;
-- **PostgreSQL Telemetry** — persistência dedicada da telemetria;
-- **MQTT / Mosquitto** — ingestão de eventos de dispositivos;
-- **OpenTelemetry + Prometheus + Tempo + Grafana** — observabilidade;
-- **Docker, GitHub Actions e Kubernetes/Kustomize** — execução e entrega;
-- **STAC providers externos** — descoberta de cenas geoespaciais por catálogo configurado.
-
-O objetivo é manter fronteiras de domínio claras sem introduzir complexidade distribuída onde ela não é necessária.
-
-## 2. Topologia
-
-```mermaid
-flowchart TB
-    USER[Usuário] --> BROWSER[Navegador]
-    USER --> PWA[PWA instalada]
-    USER --> DESKTOP[AgroControl Desktop\nTauri + WebView2]
-
-    BROWSER --> WEB[AgroControl React]
-    PWA --> WEB
-    DESKTOP --> WEB
-
-    WEB --> API[AgroControl API\nASP.NET Core]
-    API --> CORE[(PostgreSQL + PostGIS)]
-    API --> INT[AgroControl Intelligence\nPython / FastAPI / Rasterio]
-    API --> TEL[AgroControl Telemetry\nJava / Spring Boot]
-    API --> STAC[STAC Provider configurado]
-
-    DEVICES[Sensores / GPS / Estações / Máquinas] --> MQTT[MQTT / Mosquitto]
-    MQTT --> TEL
-    TEL --> TDB[(PostgreSQL Telemetry)]
-
-    API -. OTLP .-> OTEL[OpenTelemetry Collector]
-    INT -. OTLP .-> OTEL
-    TEL -. OTLP .-> OTEL
-    OTEL --> TEMPO[Tempo]
-    OTEL --> PROM[Prometheus]
-    PROM --> GRAFANA[Grafana]
-    TEMPO --> GRAFANA
-```
-
-No deployment Web, Nginx serve o build React e funciona como proxy same-origin para a API. No Desktop, o mesmo build React roda dentro do WebView do Tauri e acessa a API por uma origem configurada, sujeita a CORS explícito.
-
-## 3. Backend C#
+Estado arquitetural: **Sprint 21 concluída — API 0.21.0**.
 
 ```text
-AgroControl.Api
-      │
-      ▼
-AgroControl.Application
-      │
-      ▼
-AgroControl.Domain
-
-AgroControl.Infrastructure
-      ├── persistência EF Core/PostGIS
-      ├── autenticação e integrações
-      ├── clientes HTTP
-      └── implementações de repositórios
+Browser / PWA / Tauri
+        │
+        ▼
+React + TypeScript
+        │
+  ┌─────┴───────────────┐
+  │                     │
+  │ HTTPS               │ OfflineStore por fazenda
+  │                     │ ├── records
+  │                     │ ├── outbox
+  │                     │ └── syncMetadata
+  │                     │
+  └──────────┬──────────┘
+             ▼
+      ASP.NET Core API
+             │
+   ┌─────────┼──────────┐
+   ▼         ▼          ▼
+PostgreSQL  Python     Java
++ PostGIS   Intelligence Telemetry/MQTT
 ```
 
-### Domain
+## 2. Fronteiras de autoridade
 
-Entidades, regras, invariantes e conceitos do negócio. Não depende de HTTP, banco ou implementação de infraestrutura.
+### Backend
 
-### Application
+É autoridade para:
 
-Casos de uso, contratos, DTOs, políticas de aplicação e orquestração. Coordena o domínio sem depender de detalhes concretos de persistência.
+- identidade e autenticação;
+- `OrganizationId`;
+- papéis organizacionais;
+- `FarmAccessScope`;
+- entitlements;
+- validação de negócio;
+- persistência transacional;
+- idempotência;
+- concorrência otimista;
+- autorização de sync;
+- integração com serviços especializados.
 
-### Infrastructure
+### Frontend
 
-EF Core, PostgreSQL/PostGIS, autenticação, clientes externos, repositórios e integrações técnicas.
+É responsável por:
 
-### API
+- experiência de usuário;
+- seleção de escopo operacional;
+- cache estático do app shell;
+- armazenamento offline controlado;
+- outbox local;
+- apresentação de conflito e estados de sincronização.
 
-Entrada HTTP, autenticação, filtros de entitlement/escopo e composição de dependências. Deve permanecer fina.
+O frontend **não** decide autorização nem estado final de negócio.
 
-## 4. Multi-tenancy e escopo operacional
+## 3. Multi-tenancy e operação multi-fazenda
 
-A arquitetura possui duas fronteiras cumulativas de autorização:
+A fronteira máxima é:
 
 ```text
-OrganizationId — limite máximo do tenant
-      │
-      └── FarmAccessScope — limite operacional dentro da organização
-              ├── AllFarms
-              ├── Region
-              └── Farm
+OrganizationId
 ```
 
-`OrganizationId` impede cruzamento entre organizações. `FarmAccessScope` restringe a operação horizontal dentro do mesmo tenant.
+Dentro dela, a autorização operacional é:
 
 ```text
-Organization
-├── OperationalRegion
-│   ├── Farm A
-│   │   ├── Field
-│   │   └── Season
-│   └── Farm B
-└── Farm C
+FarmAccessScope
+├── AllFarms
+├── Region
+└── Farm
 ```
 
-O papel organizacional (`Owner`, `Admin`, `Manager`, `Viewer`) e o escopo operacional são conceitos separados. O backend resolve o escopo efetivo por request.
+`OperationalScopeContext` é inicializado por request autenticado. Módulos farm-linked usam filtros EF, SQL/PostGIS explícito ou fachadas de serviço para preservar o escopo.
 
-## 5. Autorização horizontal
+Testes cobrem Fazenda A × Fazenda B dentro da mesma organização e Organização A × Organização B.
 
-A API inicializa um `OperationalScopeContext` por request e aplica proteção em profundidade:
+## 4. Módulos
 
-1. `OrganizationId` restringe o tenant;
-2. `FarmAccessScope` restringe propriedades permitidas;
-3. query filters do EF Core protegem entidades relacionais ligadas à fazenda;
-4. SQL/PostGIS explícito recebe e aplica o mesmo escopo;
-5. Telemetry valida Farm/Field/Machine na API C# antes de acessar o serviço Java;
-6. IDs fora do escopo são tratados como inexistentes quando possível;
-7. migrations/backfills materializam `FarmId` quando necessário;
-8. testes Fazenda A × Fazenda B exercitam a fronteira horizontal.
+O backend mantém módulos separados por domínio, incluindo:
 
-Navegador, PWA e Tauri são clientes. Nenhum deles é considerado mecanismo de autorização.
+- Production;
+- Inventory;
+- Finance;
+- Machinery;
+- Market;
+- Precision Agriculture;
+- Remote Sensing;
+- Intelligence;
+- Telemetry;
+- Irrigation;
+- Sustainability;
+- Export;
+- Commercial.
 
-## 6. Módulos e entitlements
+O catálogo de entitlement permanece server-side.
 
-A disponibilidade funcional é controlada pelo backend por `ModuleKey` e plano/override da organização. O frontend pode mostrar módulos bloqueados, mas chamadas diretas à API continuam sujeitas ao mesmo entitlement.
+## 5. Persistência
 
-Planos atuais:
+### Banco principal
 
-- `Basic`;
-- `Pro`;
-- `Intelligence`;
-- `Enterprise`.
+PostgreSQL 17 + PostGIS + EF Core.
 
-O catálogo canônico de módulos por plano está em `PlanEntitlementCatalog`.
+Usado para:
 
-## 7. Persistência
+- entidades transacionais;
+- geometrias;
+- change-log offline;
+- idempotência de sync;
+- dados operacionais consolidados.
 
-O banco principal usa PostgreSQL + PostGIS e mantém ownership lógico por módulo. Raster pesado não é armazenado no banco relacional principal; ficam metadados, referências, lifecycle e estatísticas derivadas.
+### Telemetria
 
-Telemetry possui PostgreSQL próprio porque o padrão de ingestão/eventos é diferente do núcleo transacional.
+Mantém banco dedicado ao serviço Java quando necessário à fronteira de ingestão/histórico.
 
-Convenções:
+## 6. Geoespacial e sensoriamento remoto
 
-- IDs em `Guid`;
-- timestamps técnicos em UTC;
-- `DateOnly` para datas agrícolas sem horário quando aplicável;
-- dinheiro com `decimal` e moeda explícita quando necessário;
-- geometrias WGS84/SRID 4326;
-- timezone operacional em identificador IANA.
+- WGS84/SRID 4326;
+- GeoJSON;
+- PostGIS/GiST;
+- zonas de manejo;
+- cenas Satellite/Drone/Other;
+- STAC discovery;
+- NDVI/NDRE/EVI/custom;
+- Rasterio/NumPy;
+- processamento zonal;
+- MapLibre no frontend.
 
-O Desktop da Sprint 20 não adiciona banco local. Sincronização offline futura deverá possuir desenho próprio de armazenamento, fila, versão e resolução de conflitos.
+URLs/assets externos nunca substituem a validação server-side do provider/item.
 
-## 8. Geoespacial, sensoriamento remoto e raster
+## 7. Offline real
 
-PostGIS é usado para limites de talhão, zonas de manejo, footprints e consultas espaciais. Trechos SQL fora de LINQ aplicam explicitamente `OrganizationId` e o escopo operacional.
+### 7.1 Unidade de sincronização
 
-O processamento científico de GeoTIFF/COG ocorre no AgroControl Intelligence com Rasterio/NumPy. A API C# mantém autorização, contexto produtivo, idempotência e persistência dos resultados.
+A unidade offline é **uma fazenda escolhida explicitamente**.
 
-`RemoteSensingScene` permanece o modelo canônico persistido para cenas.
-
-## 9. Descoberta STAC
-
-A Sprint 19 adiciona uma camada externa de descoberta sem criar um novo domínio persistente.
+Namespace local:
 
 ```text
-Web / PWA / Desktop
-  ↓
-RemoteSceneDiscoveryEndpoints
-  ↓
-RemoteSceneDiscoveryService
-  ├── Field/Season + FarmAccessScope
-  ↓
-IRemoteSceneDiscoveryClient
-  ↓
-StacRemoteSceneDiscoveryClient
-  ↓
-Provider STAC configurado
+UserId + OrganizationId + FarmId
 ```
 
-Princípios arquiteturais:
+Isso evita mistura entre usuários, tenants ou propriedades no mesmo dispositivo.
 
-- o cliente envia `FieldId`, filtros e escolha do item/asset, nunca a URL do catálogo;
-- a geometria enviada ao provider é carregada do boundary canônico do Field no backend;
-- providers são definidos por configuração server-side;
-- busca é transitória e não persiste todos os itens externos;
-- importação reconsulta o item pelo backend usando `Provider + Collection + ExternalId`;
-- o cliente só aceita `AssetKey` que tenha sido normalizado como raster elegível;
-- `Provider + ExternalId` reaproveita a idempotência de `RemoteSensingScene`;
-- importação e processamento raster permanecem passos separados.
+### 7.2 IndexedDB
 
-### Segurança de rede STAC
-
-- HTTPS fora de loopback/local controlado;
-- credenciais embutidas em URL são rejeitadas;
-- query strings são removidas das referências normalizadas de assets;
-- paginação só segue continuação same-origin/same-path;
-- limite de resposta e timeout;
-- nenhum download de asset durante descoberta;
-- falha do provider não compromete o restante de Remote Sensing.
-
-### Observabilidade STAC
-
-O meter `AgroControl.RemoteSceneDiscovery` mede buscas, latência, volume de resultados e importações.
-
-Labels são limitadas a provider configurado e outcome. IDs de item, URL, `farmId`, `userId` e tokens não entram como labels.
-
-## 10. Telemetria
-
-AgroControl Telemetry recebe eventos via MQTT QoS 1 e mantém histórico append-only/idempotente. A API C# funciona como fronteira de autorização para os endpoints expostos ao produto, incluindo o escopo por propriedade.
-
-Dispositivos podem ser vinculados a Farm, Field e Machine. Recursos explicitamente organizacionais sem esses vínculos permanecem no escopo do tenant.
-
-## 11. Web, PWA e contexto multi-fazenda
-
-A SPA React mantém o contexto operacional durante a sessão e oferece seleção por:
-
-- todas as fazendas, quando permitido;
-- região operacional;
-- UF;
-- fazenda.
-
-O dashboard e o mapa multi-fazenda usam somente propriedades acessíveis. O mapa usa MapLibre e ajusta o enquadramento ao conjunto visível.
-
-A descoberta STAC está integrada ao workspace de Sensoriamento Remoto, com filtros, resultados paginados, footprint no mapa e importação explícita.
-
-Datas operacionais são apresentadas no timezone da fazenda quando existe uma única propriedade ativa; consolidações preservam o instante UTC e o contexto local.
-
-A PWA adiciona apenas instalação e cache do app shell. O service worker exclui `/api` e `/health`, portanto dados autenticados de negócio não são transformados em cache offline nesta fase.
-
-## 12. Desktop Tauri
-
-A Sprint 20 introduz um shell Tauri v2 para Windows, mantendo a aplicação React como única interface.
+Banco:
 
 ```text
-Tauri / WebView2
-      │
-      └── dist/ React/Vite
-              │
-              └── HTTPS → AgroControl API
+agrocontrol.offline
 ```
 
-Princípios:
+Object stores:
 
-- nenhum backend C#, PostgreSQL, Python ou Java é empacotado no instalador;
-- nenhum comando Rust privilegiado é exposto ao JavaScript na fase inicial;
-- `withGlobalTauri=false`;
-- capabilities começam vazias;
-- DevTools ficam desabilitadas na distribuição;
-- CSP declara hosts permitidos;
-- `VITE_API_BASE_URL` define a API para o build desktop;
-- a origem Windows `http://tauri.localhost` é permitida na API por CORS explícito;
-- não há `AllowAnyOrigin`;
-- JWT continua em `sessionStorage`, sem persistência nativa nova;
-- o service worker PWA não é registrado dentro do Tauri.
+```text
+records
+outbox
+syncMetadata
+```
 
-O Desktop CI gera bundles NSIS `.exe` e MSI `.msi`. Enquanto não houver certificado de code signing, esses artefatos são classificados como builds de validação não assinados, não como distribuição pública oficial.
+JWT e secrets não são persistidos nele.
 
-## 13. Segurança
+### 7.3 Allowlist
 
-Princípios atuais:
+Snapshot inicial:
 
-- JWT e autorização no backend;
-- isolamento por organização e fazenda;
-- entitlement validado na API;
-- secrets fora do repositório;
-- validação de input e integridade de referências;
-- redução de enumeração de IDs fora do escopo;
-- logs sem segredos/dados sensíveis desnecessários;
-- least privilege;
-- CodeQL e Dependabot;
-- assets raster remotos desabilitados por padrão no Intelligence;
-- STAC providers permitidos por configuração server-side;
-- CORS por allowlist para clientes cross-origin permitidos;
-- CSP explícita no shell Tauri;
-- testes cross-tenant e horizontais.
+- Farm;
+- Field;
+- Crop referenciado;
+- Season.
 
-## 14. Observabilidade e plataforma
+Mutações inicialmente permitidas:
 
-- OpenTelemetry nos serviços C#, Python e Java;
-- Prometheus para métricas;
-- Tempo para tracing;
-- Grafana para visualização;
-- health/readiness probes;
-- Docker Compose para stack integrada;
-- Kubernetes + Kustomize;
-- Platform CI com smoke tests e observabilidade.
+- Field create/update/delete lógico;
+- Season create/update/delete lógico.
 
-## 15. CI/CD
+Novos domínios só entram após definir autorização, idempotência e conflito.
 
-Principais gates:
+### 7.4 Bootstrap
+
+```text
+GET /api/v1/sync/bootstrap?farmId=...
+```
+
+Fluxo:
+
+1. revalida `FarmAccessScope`;
+2. valida farm ativa;
+3. captura watermark do change-log;
+4. emite cursor protegido;
+5. carrega somente entidades da fazenda;
+6. cliente valida relações e namespace;
+7. snapshot é substituído atomicamente somente quando não existem mutações pendentes.
+
+### 7.5 Pull incremental
+
+```text
+GET /api/v1/sync/pull?farmId=...&cursor=...
+```
+
+O cursor é opaco e inclui escopo/fazenda/sequence protegidos. Cursor adulterado, expirado ou pertencente a outra fazenda é rejeitado.
+
+O change-log é monotônico e farm-scoped. Mudança de Field entre fazendas gera materialização segura nos dois escopos relevantes, sem vazar payload ao escopo antigo.
+
+### 7.6 Push
+
+```text
+POST /api/v1/sync/push
+```
+
+Máximo de 100 operações por lote.
+
+Para cada operação:
+
+1. revalida acesso à farm;
+2. valida entity/operation allowlisted;
+3. calcula hash canônico da intenção;
+4. tenta claim idempotente;
+5. para update/delete, bloqueia a linha com `FOR UPDATE`;
+6. compara `baseServerVersion`;
+7. aplica domínio;
+8. persiste resultado idempotente;
+9. commit ocorre na mesma transação.
+
+### 7.7 Idempotência
+
+Chave lógica:
+
+```text
+OrganizationId + UserId + operationId
+```
+
+Retenção: **30 dias**.
+
+O resultado aplicado fica armazenado como JSONB para replay. Reenvio após ACK perdido retorna o mesmo efeito sem duplicar entidade. Reuso do mesmo `operationId` com conteúdo diferente é tratado como `OperationIdReuse`.
+
+### 7.8 Concorrência
+
+`serverVersion` usa `UpdatedAtUtc` canônico. Timestamps gerados para Field/Season são normalizados à precisão compatível com PostgreSQL.
+
+Não há last-write-wins silencioso.
+
+Conflito retorna:
+
+- versão atual;
+- snapshot atual quando seguro;
+- código explícito.
+
+O cliente preserva a proposta local e oferece uso do servidor ou reaplicação com novo `operationId`.
+
+### 7.9 Outbox
+
+Staging local grava `record + mutation` na mesma transação IndexedDB.
+
+Uma operação só é removida depois de ACK válido.
+
+Falhas transitórias permanecem como `Retryable`. A engine usa retry exponencial limitado e só executa pull depois que a fila enviável está limpa.
+
+### 7.10 Revogação
+
+O acesso é revalidado no início do lote e antes de cada operação. Se for revogado durante o período offline ou no meio do lote:
+
+- operações posteriores são bloqueadas;
+- ACKs já confirmados permanecem válidos;
+- cliente purga records/outbox da farm revogada;
+- metadata fica `Blocked`.
+
+## 8. Segurança local
+
+- OfflineStore não contém JWT/secret;
+- logout explícito limpa material offline;
+- troca de usuário/organização limpa o contexto anterior;
+- retorno do mesmo usuário preserva a cópia válida;
+- operações não podem escolher outro `OrganizationId`;
+- payload Field não pode mover entidade para outra farm;
+- Season só pode apontar para Field da mesma farm do namespace;
+- cursor não amplia escopo.
+
+## 9. PWA e Desktop
+
+A mesma SPA é usada nas três superfícies.
+
+PWA:
+
+- service worker para shell/assets;
+- `/api` e `/health` não são cacheados como dados de negócio.
+
+Tauri:
+
+- reutiliza a SPA;
+- WebView2;
+- CSP explícita;
+- sem backend local embutido;
+- IndexedDB da WebView é usado pela camada offline atual;
+- sem plugin de banco nativo enquanto não houver necessidade comprovada.
+
+## 10. Observabilidade
+
+OpenTelemetry coleta traces/métricas da API e integra com Collector/Prometheus/Tempo/Grafana.
+
+Sync publica métricas de baixa cardinalidade:
+
+- `agrocontrol.sync.batches`;
+- `agrocontrol.sync.operations`;
+- `agrocontrol.sync.retries`;
+- `agrocontrol.sync.invalid_cursors`;
+- `agrocontrol.sync.access_revocations`;
+- `agrocontrol.sync.duration`;
+- `agrocontrol.sync.batch_size`.
+
+Não são utilizados `UserId`, `FarmId` ou `operationId` como labels.
+
+## 11. CI/CD
+
+Gates principais:
 
 - Backend CI;
-- Intelligence CI;
-- Telemetry CI;
 - Frontend CI;
-- Desktop CI Windows;
 - Platform CI;
-- CodeQL;
-- Dependabot.
+- Desktop CI;
+- CodeQL.
 
-A partir da Sprint 20, mudanças na distribuição instalável só são encerradas depois de **Frontend CI + Desktop CI + Backend CI + Platform CI + CodeQL** verdes no mesmo head final.
+Imagens podem ser publicadas no GHCR com provenance/SBOM conforme workflows existentes.
 
-O Desktop CI usa runner Windows e constrói os bundles Tauri da mesma SPA usada pela Web. Assinatura de código e atualização automática permanecem bloqueadas até existir estratégia de distribuição de produção e certificado real.
+## 12. Estado atual
 
-## 16. Estado atual
+Arquitetura consolidada até a **Sprint 21**.
 
-A arquitetura funcional está consolidada até a **Sprint 19 — STAC e descoberta de cenas**, com API `0.19.0`. A Sprint 20 adiciona as superfícies instaláveis PWA/Tauri sem alterar as fronteiras do backend.
-
-As próximas evoluções devem preservar: tenant, escopo operacional, módulo/entitlement, confiança de integrações externas, separação cliente/servidor e responsabilidades específicas de C#, Python e Java.
+As próximas evoluções devem preservar as mesmas fronteiras: tenant, farm scope, entitlement, cliente não-autoritativo, contratos explícitos entre serviços e entrada gradual de novos domínios na allowlist offline.

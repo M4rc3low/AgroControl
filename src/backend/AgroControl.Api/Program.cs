@@ -18,6 +18,7 @@ using AgroControl.Application.Production;
 using AgroControl.Application.RegionalOperations;
 using AgroControl.Application.Subscriptions;
 using AgroControl.Application.Sustainability;
+using AgroControl.Application.Sync;
 using AgroControl.Application.Telemetry;
 using AgroControl.Domain.Platform;
 using AgroControl.Infrastructure;
@@ -48,6 +49,8 @@ builder.Services.AddScoped<MultiFarmService>();
 builder.Services.AddScoped<FieldService>();
 builder.Services.AddScoped<CropService>();
 builder.Services.AddScoped<SeasonService>();
+builder.Services.AddScoped<OfflineSyncService>();
+builder.Services.AddScoped<OfflinePushService>();
 builder.Services.AddScoped<InventoryService>();
 builder.Services.AddScoped<IrrigationService>();
 builder.Services.AddScoped<SustainabilityService>();
@@ -80,7 +83,8 @@ if (builder.Configuration.GetValue<bool>("Observability:Enabled"))
                 "Microsoft.AspNetCore.Hosting",
                 "Microsoft.AspNetCore.Server.Kestrel",
                 "System.Net.Http",
-                RemoteSceneDiscoveryTelemetry.MeterName)
+                RemoteSceneDiscoveryTelemetry.MeterName,
+                OfflineSyncTelemetry.MeterName)
             .AddOtlpExporter());
 }
 
@@ -137,7 +141,7 @@ app.Use(async (httpContext, next) =>
 app.UseAuthorization();
 if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations")) await app.Services.ApplyDatabaseMigrationsAsync();
 
-app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.19.0" }));
+app.MapGet("/", () => Results.Ok(new { service = "AgroControl.Api", status = "running", version = "0.21.0" }));
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -189,6 +193,7 @@ authorized.MapGet("/platform/modules/{moduleKey}/access", async (string moduleKe
 
 app.MapProductionEndpoints();
 app.MapMultiFarmEndpoints();
+app.MapSyncEndpoints();
 app.MapInventoryEndpoints();
 app.MapFinanceEndpoints();
 app.MapMachineryEndpoints();
