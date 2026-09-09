@@ -41,6 +41,14 @@ function requireIndexedDb() {
   return indexedDB;
 }
 
+function expectedRecordState(operation: OfflineMutation['operation']) {
+  switch (operation) {
+    case 'create': return 'PendingCreate';
+    case 'update': return 'PendingUpdate';
+    case 'delete': return 'PendingDelete';
+  }
+}
+
 export class IndexedDbOfflineStore implements OfflineStore {
   private dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -116,6 +124,40 @@ export class IndexedDbOfflineStore implements OfflineStore {
     const db = await this.getDb();
     const transaction = db.transaction(OUTBOX_STORE, 'readwrite');
     transaction.objectStore(OUTBOX_STORE).delete(operationId);
+    await transactionToPromise(transaction);
+  }
+
+  async stageMutation<TRecord, TPayload>(
+    record: OfflineRecord<TRecord>,
+    mutation: OfflineMutation<TPayload>
+  ) {
+    assertOfflineRecord(record);
+    assertOfflineMutation(mutation);
+    if (record.namespaceKey !== mutation.namespaceKey ||
+        record.entityKind !== mutation.entityKind ||
+        record.entityId !== mutation.entityId) {
+      throw new Error('Offline mutation and record must describe the same namespaced entity.');
+    }
+    if (mutation.state !== 'Pending') {
+      throw new Error('New offline mutations must start in Pending state.');
+    }
+    if (record.syncState !== expectedRecordState(mutation.operation)) {
+      throw new Error('Offline record state does not match the staged mutation operation.');
+    }
+
+    const db = await this.getDb();
+    const transaction = db.transaction([RECORDS_STORE, OUTBOX_STORE], 'readwrite');
+    const outbox = transaction.objectStore(OUTBOX_STORE);
+    const existing = await requestToPromise(
+      outbox.index(NAMESPACE_INDEX).getAll(IDBKeyRange.only(mutation.namespaceKey))
+    ) as OfflineMutation[];
+    if (existing.some(item => item.entityKind === mutation.entityKind && item.entityId === mutation.entityId)) {
+      transaction.abort();
+      throw new Error('This entity already has a pending offline mutation. Synchronize or resolve it first.');
+    }
+
+    transaction.objectStore(RECORDS_STORE).put(record);
+    outbox.add(mutation);
     await transactionToPromise(transaction);
   }
 
@@ -251,6 +293,41 @@ export class IndexedDbOfflineStore implements OfflineStore {
     ]);
 
     transaction.objectStore(SYNC_METADATA_STORE).delete(namespaceKey);
+    await transactionToPromise(transaction);
+  }
+
+  async blockAndPurgeNamespace(namespaceKey: string, reason: string) {
+    const normalizedReason = reason.trim();
+    if (!namespaceKey.trim() || !normalizedReason) {
+      throw new Error('Namespace and reason are required when blocking offline data.');
+    }
+
+    const db = await this.getDb();
+    const transaction = db.transaction([RECORDS_STORE, OUTBOX_STORE, SYNC_METADATA_STORE], 'readwrite');
+    await Promise.all([
+      this.deleteByNamespace(transaction.objectStore(RECORDS_STORE), namespaceKey),
+      this.deleteByNamespace(transaction.objectStore(OUTBOX_STORE), namespaceKey)
+    ]);
+
+    const metadataStore = transaction.objectStore(SYNC_METADATA_STORE);
+    const current = await requestToPromise(metadataStore.get(namespaceKey)) as OfflineSyncMetadata | undefined;
+    metadataStore.put({
+      namespaceKey,
+      cursor: null,
+      lastSyncedAtUtc: current?.lastSyncedAtUtc ?? null,
+      preparationState: 'Blocked',
+      schemaVersion: current?.schemaVersion ?? 1,
+      lastError: normalizedReason
+    } satisfies OfflineSyncMetadata);
+    await transactionToPromise(transaction);
+  }
+
+  async clearAll() {
+    const db = await this.getDb();
+    const transaction = db.transaction([RECORDS_STORE, OUTBOX_STORE, SYNC_METADATA_STORE], 'readwrite');
+    transaction.objectStore(RECORDS_STORE).clear();
+    transaction.objectStore(OUTBOX_STORE).clear();
+    transaction.objectStore(SYNC_METADATA_STORE).clear();
     await transactionToPromise(transaction);
   }
 
