@@ -15,6 +15,8 @@ export interface OfflineBootstrapResponse {
   protocolVersion: number;
   localSchemaVersion: number;
   serverTimeUtc: string;
+  cursor: string;
+  watermarkSequence: number;
 }
 
 export interface OfflineBootstrapSnapshot {
@@ -62,6 +64,9 @@ export function buildOfflineBootstrapSnapshot(
     throw new Error(
       `Offline schema ${response.localSchemaVersion} is not supported by this client.`
     );
+  }
+  if (!response.cursor?.trim() || !Number.isSafeInteger(response.watermarkSequence) || response.watermarkSequence < 0) {
+    throw new Error('Offline bootstrap did not return a valid synchronization cursor.');
   }
 
   if (response.farm.id !== namespace.farmId) {
@@ -155,7 +160,7 @@ export function buildOfflineBootstrapSnapshot(
     records,
     metadata: {
       namespaceKey,
-      cursor: null,
+      cursor: response.cursor,
       lastSyncedAtUtc,
       preparationState: 'Ready',
       schemaVersion: LOCAL_SCHEMA_VERSION,
