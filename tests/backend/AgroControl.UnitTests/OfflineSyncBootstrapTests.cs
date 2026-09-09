@@ -36,7 +36,7 @@ public sealed class OfflineSyncBootstrapTests
             [field],
             [referencedCrop, unrelatedCrop],
             [season]);
-        var service = new OfflineSyncService(repository, new FakeFarmAccessScope(true));
+        var service = CreateService(repository, allowed: true, watermark: 42);
 
         var result = await service.BootstrapAsync(organizationId, userId, farm.Id);
 
@@ -52,6 +52,8 @@ public sealed class OfflineSyncBootstrapTests
         Assert.DoesNotContain(result.Value.Crops, crop => crop.Id == unrelatedCrop.Id);
         Assert.Equal(1, result.Value.ProtocolVersion);
         Assert.Equal(1, result.Value.LocalSchemaVersion);
+        Assert.Equal(42, result.Value.WatermarkSequence);
+        Assert.Equal("cursor-42", result.Value.Cursor);
         Assert.Equal([farm.Id], repository.FieldAllowedFarmIds);
         Assert.Equal([farm.Id], repository.SeasonAllowedFarmIds);
     }
@@ -68,7 +70,7 @@ public sealed class OfflineSyncBootstrapTests
             "SP",
             DateTime.UtcNow);
         var repository = new FakeProductionRepository(farm, [], [], []);
-        var service = new OfflineSyncService(repository, new FakeFarmAccessScope(false));
+        var service = CreateService(repository, allowed: false);
 
         var result = await service.BootstrapAsync(organizationId, Guid.NewGuid(), farm.Id);
 
@@ -97,13 +99,23 @@ public sealed class OfflineSyncBootstrapTests
             null,
             now);
         var repository = new FakeProductionRepository(farm, [field], [], [season]);
-        var service = new OfflineSyncService(repository, new FakeFarmAccessScope(true));
+        var service = CreateService(repository, allowed: true);
 
         var result = await service.BootstrapAsync(organizationId, Guid.NewGuid(), farm.Id);
 
         Assert.False(result.Succeeded);
         Assert.Equal(OperationErrorKind.Conflict, result.ErrorKind);
     }
+
+    private static OfflineSyncService CreateService(
+        IProductionRepository repository,
+        bool allowed,
+        long watermark = 0) =>
+        new(
+            repository,
+            new FakeFarmAccessScope(allowed),
+            new FakeChangeRepository(watermark),
+            new FakeCursorProtector());
 
     private sealed class FakeFarmAccessScope(bool allowed) : IFarmAccessScope
     {
@@ -119,6 +131,36 @@ public sealed class OfflineSyncBootstrapTests
             Guid farmId,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(allowed);
+    }
+
+    private sealed class FakeChangeRepository(long watermark) : IOfflineSyncChangeRepository
+    {
+        public Task<long> GetCurrentSequenceAsync(
+            Guid organizationId,
+            CancellationToken cancellationToken = default) => Task.FromResult(watermark);
+
+        public Task<IReadOnlyList<OfflineSyncChangeEntry>> ListAfterAsync(
+            Guid organizationId,
+            Guid farmId,
+            long afterSequence,
+            int take,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<OfflineSyncChangeEntry>>([]);
+    }
+
+    private sealed class FakeCursorProtector : IOfflineSyncCursorProtector
+    {
+        public string Protect(
+            Guid organizationId,
+            Guid farmId,
+            long sequence,
+            DateTime issuedAtUtc) => $"cursor-{sequence}";
+
+        public OfflineSyncCursorValidation Validate(
+            string cursor,
+            Guid expectedOrganizationId,
+            Guid expectedFarmId,
+            DateTime nowUtc) => OfflineSyncCursorValidation.Valid(0);
     }
 
     private sealed class FakeProductionRepository(
