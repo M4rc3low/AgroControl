@@ -72,7 +72,7 @@ public static class SyncEndpoints
 
             OfflineSyncTelemetry.RecordBatch(
                 "pull",
-                result.Succeeded ? "completed" : result.ErrorKind?.ToString() ?? "other",
+                result.Succeeded ? "completed" : result.ErrorKind.ToString(),
                 started,
                 result.Value?.Changes.Count ?? 0);
 
@@ -109,9 +109,9 @@ public static class SyncEndpoints
 
             OfflineSyncTelemetry.RecordBatch(
                 "push",
-                result.Succeeded ? "completed" : result.ErrorKind?.ToString() ?? "other",
+                result.Succeeded ? "completed" : result.ErrorKind.ToString(),
                 started,
-                request?.Operations?.Count ?? 0);
+                request.Operations?.Count ?? 0);
 
             return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
         });
