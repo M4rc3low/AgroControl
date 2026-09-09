@@ -1,6 +1,6 @@
 [package]
 name = "agrocontrol-desktop"
-version = "0.20.0"
+version = "0.21.0"
 description = "AgroControl desktop shell"
 authors = ["AgroControl"]
 edition = "2021"
