@@ -28,6 +28,21 @@ public static class SyncEndpoints
             return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
         });
 
+        group.MapGet("/bootstrap", async (
+            Guid farmId,
+            ClaimsPrincipal user,
+            OfflineSyncService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.BootstrapAsync(
+                GetOrganizationId(user),
+                GetUserId(user),
+                farmId,
+                ct);
+
+            return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
+        });
+
         return endpoints;
     }
 
