@@ -10,6 +10,7 @@ import { Button, Spinner } from './Ui';
 const navigation = [
   { to: '/', label: 'Visão geral', icon: 'dashboard' as const },
   { to: '/production', label: 'Produção rural', icon: 'leaf' as const, module: 'Farms' },
+  { to: '/offline', label: 'Modo offline', icon: 'radio' as const, module: 'Farms' },
   { to: '/precision', label: 'Agricultura de precisão', icon: 'map' as const, module: 'PrecisionAgriculture' },
   { to: '/precision/remote-sensing', label: 'Sensoriamento remoto', icon: 'spark' as const, module: 'PrecisionAgriculture' },
   { to: '/precision/remote-sensing/discovery', label: 'Descobrir cenas', icon: 'search' as const, module: 'PrecisionAgriculture' },
