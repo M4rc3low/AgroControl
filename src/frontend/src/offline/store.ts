@@ -17,6 +17,10 @@ export interface OfflineStore {
   listMutations<T>(namespaceKey: string): Promise<OfflineMutation<T>[]>;
   putMutation<T>(mutation: OfflineMutation<T>): Promise<void>;
   deleteMutation(operationId: string): Promise<void>;
+  stageMutation<TRecord, TPayload>(
+    record: OfflineRecord<TRecord>,
+    mutation: OfflineMutation<TPayload>
+  ): Promise<void>;
 
   getSyncMetadata(namespaceKey: string): Promise<OfflineSyncMetadata | null>;
   putSyncMetadata(metadata: OfflineSyncMetadata): Promise<void>;
@@ -35,4 +39,6 @@ export interface OfflineStore {
   ): Promise<void>;
 
   clearNamespace(namespaceKey: string): Promise<void>;
+  blockAndPurgeNamespace(namespaceKey: string, reason: string): Promise<void>;
+  clearAll(): Promise<void>;
 }
