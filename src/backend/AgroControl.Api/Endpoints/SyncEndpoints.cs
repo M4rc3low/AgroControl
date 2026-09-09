@@ -43,6 +43,25 @@ public static class SyncEndpoints
             return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
         });
 
+        group.MapGet("/pull", async (
+            Guid farmId,
+            string cursor,
+            ClaimsPrincipal user,
+            OfflineSyncService service,
+            int take = 200,
+            CancellationToken ct = default) =>
+        {
+            var result = await service.PullAsync(
+                GetOrganizationId(user),
+                GetUserId(user),
+                farmId,
+                cursor,
+                take,
+                ct);
+
+            return result.Succeeded ? Results.Ok(result.Value) : ToError(result);
+        });
+
         return endpoints;
     }
 
