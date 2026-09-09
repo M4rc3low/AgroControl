@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { PropsWithChildren } from 'react';
+import { offlineStore } from '../offline/indexedDbOfflineStore';
 import { apiRequest } from './api';
 import { clearSession, loadSession, saveSession } from './session';
 import type { AuthResponse, EntitlementSnapshot, MeProfile, ModuleDefinition, Organization, PlatformContext } from './types';
@@ -22,7 +23,32 @@ interface AuthContextValue {
   refreshContext(): Promise<void>;
 }
 
+const OFFLINE_PRINCIPAL_KEY = 'agrocontrol.offline.principal.v1';
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function readOfflinePrincipal() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_PRINCIPAL_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as { userId?: string; organizationId?: string };
+    return value.userId && value.organizationId
+      ? { userId: value.userId, organizationId: value.organizationId }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function prepareOfflinePrincipal(session: AuthResponse) {
+  const previous = readOfflinePrincipal();
+  if (previous && (previous.userId !== session.userId || previous.organizationId !== session.organizationId)) {
+    await offlineStore.clearAll();
+  }
+  localStorage.setItem(OFFLINE_PRINCIPAL_KEY, JSON.stringify({
+    userId: session.userId,
+    organizationId: session.organizationId
+  }));
+}
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<AuthResponse | null>(() => loadSession());
@@ -32,10 +58,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const logout = useCallback(() => {
     clearSession();
+    localStorage.removeItem(OFFLINE_PRINCIPAL_KEY);
     setSession(null);
     setPlatform(null);
     setContextError(null);
     setContextLoading(false);
+    void offlineStore.clearAll().catch(() => undefined);
   }, []);
 
   const refreshContext = useCallback(async () => {
@@ -63,8 +91,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [session, refreshContext]);
 
   useEffect(() => {
-    window.addEventListener('agrocontrol:unauthorized', logout);
-    return () => window.removeEventListener('agrocontrol:unauthorized', logout);
+    const handleUnauthorized = () => logout();
+    window.addEventListener('agrocontrol:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('agrocontrol:unauthorized', handleUnauthorized);
   }, [logout]);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -73,6 +102,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       body: JSON.stringify({ email, password }),
       auth: false
     });
+    await prepareOfflinePrincipal(result);
     saveSession(result);
     setSession(result);
   }, []);
@@ -83,6 +113,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       body: JSON.stringify(input),
       auth: false
     });
+    await prepareOfflinePrincipal(result);
     saveSession(result);
     setSession(result);
   }, []);
