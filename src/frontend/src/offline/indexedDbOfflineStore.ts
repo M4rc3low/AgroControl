@@ -5,6 +5,11 @@ import type {
   OfflineRecord,
   OfflineSyncMetadata
 } from './types';
+import {
+  assertOfflineMutation,
+  assertOfflineRecord,
+  assertOfflineSyncMetadata
+} from './validation';
 
 const DB_NAME = 'agrocontrol.offline';
 const DB_VERSION = 1;
@@ -44,6 +49,7 @@ export class IndexedDbOfflineStore implements OfflineStore {
   }
 
   async putRecord<T>(record: OfflineRecord<T>) {
+    assertOfflineRecord(record);
     const db = await this.getDb();
     const transaction = db.transaction(RECORDS_STORE, 'readwrite');
     transaction.objectStore(RECORDS_STORE).put(record);
@@ -78,6 +84,7 @@ export class IndexedDbOfflineStore implements OfflineStore {
   }
 
   async enqueueMutation<T>(mutation: OfflineMutation<T>) {
+    assertOfflineMutation(mutation);
     const db = await this.getDb();
     const transaction = db.transaction(OUTBOX_STORE, 'readwrite');
     transaction.objectStore(OUTBOX_STORE).add(mutation);
@@ -98,6 +105,7 @@ export class IndexedDbOfflineStore implements OfflineStore {
   }
 
   async putMutation<T>(mutation: OfflineMutation<T>) {
+    assertOfflineMutation(mutation);
     const db = await this.getDb();
     const transaction = db.transaction(OUTBOX_STORE, 'readwrite');
     transaction.objectStore(OUTBOX_STORE).put(mutation);
@@ -120,6 +128,7 @@ export class IndexedDbOfflineStore implements OfflineStore {
   }
 
   async putSyncMetadata(metadata: OfflineSyncMetadata) {
+    assertOfflineSyncMetadata(metadata);
     const db = await this.getDb();
     const transaction = db.transaction(SYNC_METADATA_STORE, 'readwrite');
     transaction.objectStore(SYNC_METADATA_STORE).put(metadata);
