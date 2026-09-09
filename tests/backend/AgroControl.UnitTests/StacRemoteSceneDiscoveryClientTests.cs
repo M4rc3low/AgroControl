@@ -66,12 +66,12 @@ public sealed class StacRemoteSceneDiscoveryClientTests
         Assert.Equal(10m, item.SpatialResolutionMeters);
         Assert.Null(result.Value.ContinuationToken);
 
-        var red = Assert.Single(item.Assets.Where(asset => asset.Key == "red"));
+        var red = Assert.Single(item.Assets, asset => asset.Key == "red");
         Assert.True(red.IsRasterCandidate);
         Assert.Equal("https://assets.example.test/red.tif", red.Href);
         Assert.DoesNotContain("secret-value", red.Href, StringComparison.Ordinal);
 
-        var thumbnail = Assert.Single(item.Assets.Where(asset => asset.Key == "thumbnail"));
+        var thumbnail = Assert.Single(item.Assets, asset => asset.Key == "thumbnail");
         Assert.False(thumbnail.IsRasterCandidate);
         Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
@@ -108,7 +108,7 @@ public sealed class StacRemoteSceneDiscoveryClientTests
         Assert.Equal(2, handler.Requests.Count);
         Assert.Equal(HttpMethod.Get, handler.Requests[1].Method);
         Assert.Equal("catalog.example.test", handler.Requests[1].RequestUri!.Host);
-        Assert.Equal("/v1/search", handler.Requests[1].RequestUri.AbsolutePath);
+        Assert.Equal("/v1/search", handler.Requests[1].RequestUri!.AbsolutePath);
     }
 
     [Fact]
