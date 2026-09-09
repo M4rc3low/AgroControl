@@ -6,6 +6,7 @@ import type { OfflineStore } from './store';
 import type { OfflineNamespace } from './types';
 
 const MAX_PUSH_BATCHES_PER_RUN = 10;
+const MAX_RETRY_ROUNDS_PER_RUN = 3;
 
 export type OfflineSyncRunState =
   | 'Offline'
@@ -24,6 +25,15 @@ export interface OfflineSyncRunResult {
   failed: number;
   hasMorePull: boolean;
   message: string | null;
+}
+
+export function computeOfflineRetryDelay(attempts: number) {
+  const normalizedAttempts = Math.max(1, Math.floor(attempts));
+  return Math.min(1_000 * (2 ** Math.min(normalizedAttempts - 1, 4)), 15_000);
+}
+
+function wait(ms: number) {
+  return new Promise<void>(resolve => setTimeout(resolve, ms));
 }
 
 export async function syncFarmOffline(
@@ -46,6 +56,8 @@ export async function syncFarmOffline(
 
   const namespaceKey = createOfflineNamespaceKey(namespace);
   let pushed = 0;
+  let retryRounds = 0;
+
   for (let batch = 0; batch < MAX_PUSH_BATCHES_PER_RUN; batch += 1) {
     const result = await pushFarmOffline(namespace, store);
     pushed += result.applied;
@@ -61,7 +73,20 @@ export async function syncFarmOffline(
         message: result.blockedReason
       };
     }
-    if (result.retryable > 0 || result.conflicts > 0 || result.failed > 0 || result.attempted === 0) break;
+    if (result.conflicts > 0 || result.failed > 0 || result.attempted === 0) break;
+
+    if (result.retryable > 0) {
+      retryRounds += 1;
+      if (retryRounds >= MAX_RETRY_ROUNDS_PER_RUN) break;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) break;
+
+      const retryable = (await store.listMutations(namespaceKey))
+        .filter(item => item.state === 'Retryable');
+      const attempts = retryable.length
+        ? Math.max(...retryable.map(item => item.attempts))
+        : retryRounds;
+      await wait(computeOfflineRetryDelay(attempts));
+    }
   }
 
   const remaining = await store.listMutations(namespaceKey);
