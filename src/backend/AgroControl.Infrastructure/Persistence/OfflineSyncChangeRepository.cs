@@ -30,25 +30,40 @@ public sealed class OfflineSyncChangeRepository(AgroControlDbContext dbContext) 
         CancellationToken cancellationToken = default)
     {
         if (afterSequence < 0) throw new ArgumentOutOfRangeException(nameof(afterSequence));
-        take = Math.Clamp(take, 1, 500);
+        take = Math.Clamp(take, 1, 501);
 
         return await WithConnectionAsync(async connection =>
         {
             await using var command = connection.CreateCommand();
             command.CommandText =
                 """
-                SELECT sequence,
-                       organization_id,
-                       farm_id,
-                       entity_kind,
-                       entity_id,
-                       change_type,
-                       occurred_at_utc
-                  FROM offline_sync_changes
-                 WHERE organization_id = @organization_id
-                   AND sequence > @after_sequence
-                   AND (farm_id = @farm_id OR farm_id IS NULL)
-                 ORDER BY sequence
+                SELECT c.sequence,
+                       c.organization_id,
+                       c.farm_id,
+                       c.entity_kind,
+                       c.entity_id,
+                       c.change_type,
+                       c.occurred_at_utc
+                  FROM offline_sync_changes AS c
+                 WHERE c.organization_id = @organization_id
+                   AND c.sequence > @after_sequence
+                   AND (
+                        c.farm_id = @farm_id
+                        OR (
+                            c.farm_id IS NULL
+                            AND c.entity_kind = 'crop'
+                            AND c.change_type = 'upsert'
+                            AND EXISTS (
+                                SELECT 1
+                                  FROM seasons AS season
+                                  JOIN fields AS field ON field."Id" = season."FieldId"
+                                 WHERE season."OrganizationId" = @organization_id
+                                   AND season."CropId" = c.entity_id
+                                   AND field."FarmId" = @farm_id
+                            )
+                        )
+                   )
+                 ORDER BY c.sequence
                  LIMIT @take;
                 """;
             AddParameter(command, "@organization_id", organizationId);
