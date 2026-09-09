@@ -61,7 +61,9 @@ function response(): OfflineBootstrapResponse {
     }],
     protocolVersion: 1,
     localSchemaVersion: 1,
-    serverTimeUtc: '2026-09-09T01:00:00Z'
+    serverTimeUtc: '2026-09-09T01:00:00Z',
+    cursor: 'opaque-cursor',
+    watermarkSequence: 42
   };
 }
 
@@ -75,6 +77,7 @@ describe('offline bootstrap snapshot', () => {
     expect(snapshot.records.every((item) => item.syncState === 'Clean')).toBe(true);
     expect(snapshot.metadata.preparationState).toBe('Ready');
     expect(snapshot.metadata.lastSyncedAtUtc).toBe('2026-09-09T01:00:00Z');
+    expect(snapshot.metadata.cursor).toBe('opaque-cursor');
   });
 
   it('rejects a field from another farm', () => {
@@ -106,5 +109,15 @@ describe('offline bootstrap snapshot', () => {
     payload.localSchemaVersion = 2;
 
     expect(() => buildOfflineBootstrapSnapshot(namespace, payload)).toThrow(/not supported/);
+  });
+
+  it('rejects a missing or invalid synchronization cursor', () => {
+    const payload = response();
+    payload.cursor = '';
+    expect(() => buildOfflineBootstrapSnapshot(namespace, payload)).toThrow(/valid synchronization cursor/);
+
+    const invalidWatermark = response();
+    invalidWatermark.watermarkSequence = -1;
+    expect(() => buildOfflineBootstrapSnapshot(namespace, invalidWatermark)).toThrow(/valid synchronization cursor/);
   });
 });
