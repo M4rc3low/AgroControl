@@ -1,6 +1,8 @@
 import { createOfflineRecordKeyFromNamespace } from './namespace';
 import type { OfflineMutation, OfflineRecord, OfflineSyncMetadata } from './types';
 
+const MUTATION_STATES = new Set(['Pending', 'Retryable', 'Conflict', 'Failed']);
+
 function requireValue(value: string, fieldName: string) {
   if (!value.trim()) throw new Error(`${fieldName} is required for offline storage.`);
 }
@@ -21,6 +23,10 @@ export function assertOfflineRecord(record: OfflineRecord) {
   if (record.key !== expectedKey) {
     throw new Error('Offline record key does not match its namespace/entity identity.');
   }
+
+  if (record.syncState === 'Conflict' && !record.conflict) {
+    throw new Error('Offline conflict records require a conflict snapshot.');
+  }
 }
 
 export function assertOfflineMutation(mutation: OfflineMutation) {
@@ -33,9 +39,17 @@ export function assertOfflineMutation(mutation: OfflineMutation) {
   if (!Number.isInteger(mutation.attempts) || mutation.attempts < 0) {
     throw new Error('Offline mutation attempts must be a non-negative integer.');
   }
-
+  if (!MUTATION_STATES.has(mutation.state)) {
+    throw new Error('Offline mutation state is invalid.');
+  }
   if (mutation.operation === 'delete' && mutation.payload !== null) {
     throw new Error('Offline delete mutations must not persist a payload.');
+  }
+  if (mutation.operation === 'create' && mutation.baseServerVersion !== null) {
+    throw new Error('Offline create mutations must not include a base server version.');
+  }
+  if (mutation.operation !== 'create' && !mutation.baseServerVersion?.trim()) {
+    throw new Error('Offline update/delete mutations require a base server version.');
   }
 }
 
