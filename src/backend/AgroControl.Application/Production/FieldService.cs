@@ -88,7 +88,7 @@ public sealed class FieldService(
         if (allocatedArea + command.AreaHectares > farm.TotalAreaHectares)
             return OperationResult<FieldDto>.Validation("The sum of active field areas cannot be greater than the farm total area.");
 
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = DatabaseTimestamp.UtcNow();
         var field = explicitId is null
             ? Field.Create(organizationId, command.FarmId, command.Name, command.AreaHectares, nowUtc)
             : Field.CreateWithId(explicitId.Value, organizationId, command.FarmId, command.Name, command.AreaHectares, nowUtc);
@@ -122,7 +122,7 @@ public sealed class FieldService(
         if (allocatedArea + command.AreaHectares > farm.TotalAreaHectares)
             return OperationResult<FieldDto>.Validation("The sum of active field areas cannot be greater than the farm total area.");
 
-        field.Update(command.FarmId, command.Name, command.AreaHectares, DateTime.UtcNow);
+        field.Update(command.FarmId, command.Name, command.AreaHectares, DatabaseTimestamp.UtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<FieldDto>.Success(ToDto(field));
     }
@@ -137,7 +137,7 @@ public sealed class FieldService(
         if (field is null || !await accessScope.CanAccessFarmAsync(organizationId, userId, field.FarmId, cancellationToken))
             return OperationResult<bool>.NotFound("Field not found.");
 
-        field.Deactivate(DateTime.UtcNow);
+        field.Deactivate(DatabaseTimestamp.UtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<bool>.Success(true);
     }
