@@ -49,6 +49,22 @@ function expectedRecordState(operation: OfflineMutation['operation']) {
   }
 }
 
+function assertStagedPair(record: OfflineRecord, mutation: OfflineMutation) {
+  assertOfflineRecord(record);
+  assertOfflineMutation(mutation);
+  if (record.namespaceKey !== mutation.namespaceKey ||
+      record.entityKind !== mutation.entityKind ||
+      record.entityId !== mutation.entityId) {
+    throw new Error('Offline mutation and record must describe the same namespaced entity.');
+  }
+  if (mutation.state !== 'Pending') {
+    throw new Error('New offline mutations must start in Pending state.');
+  }
+  if (record.syncState !== expectedRecordState(mutation.operation)) {
+    throw new Error('Offline record state does not match the staged mutation operation.');
+  }
+}
+
 export class IndexedDbOfflineStore implements OfflineStore {
   private dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -131,19 +147,7 @@ export class IndexedDbOfflineStore implements OfflineStore {
     record: OfflineRecord<TRecord>,
     mutation: OfflineMutation<TPayload>
   ) {
-    assertOfflineRecord(record);
-    assertOfflineMutation(mutation);
-    if (record.namespaceKey !== mutation.namespaceKey ||
-        record.entityKind !== mutation.entityKind ||
-        record.entityId !== mutation.entityId) {
-      throw new Error('Offline mutation and record must describe the same namespaced entity.');
-    }
-    if (mutation.state !== 'Pending') {
-      throw new Error('New offline mutations must start in Pending state.');
-    }
-    if (record.syncState !== expectedRecordState(mutation.operation)) {
-      throw new Error('Offline record state does not match the staged mutation operation.');
-    }
+    assertStagedPair(record, mutation);
 
     const db = await this.getDb();
     const transaction = db.transaction([RECORDS_STORE, OUTBOX_STORE], 'readwrite');
@@ -157,6 +161,32 @@ export class IndexedDbOfflineStore implements OfflineStore {
     }
 
     transaction.objectStore(RECORDS_STORE).put(record);
+    outbox.add(mutation);
+    await transactionToPromise(transaction);
+  }
+
+  async replaceMutation<TRecord, TPayload>(
+    previousOperationId: string,
+    record: OfflineRecord<TRecord>,
+    mutation: OfflineMutation<TPayload>
+  ) {
+    if (!previousOperationId.trim()) throw new Error('Previous operation id is required.');
+    assertStagedPair(record, mutation);
+
+    const db = await this.getDb();
+    const transaction = db.transaction([RECORDS_STORE, OUTBOX_STORE], 'readwrite');
+    const outbox = transaction.objectStore(OUTBOX_STORE);
+    const previous = await requestToPromise(outbox.get(previousOperationId)) as OfflineMutation | undefined;
+    if (!previous || previous.state !== 'Conflict' ||
+        previous.namespaceKey !== mutation.namespaceKey ||
+        previous.entityKind !== mutation.entityKind ||
+        previous.entityId !== mutation.entityId) {
+      transaction.abort();
+      throw new Error('Only the matching conflict mutation can be replaced for reapply.');
+    }
+
+    transaction.objectStore(RECORDS_STORE).put(record);
+    outbox.delete(previousOperationId);
     outbox.add(mutation);
     await transactionToPromise(transaction);
   }
