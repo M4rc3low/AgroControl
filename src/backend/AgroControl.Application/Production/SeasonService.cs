@@ -94,7 +94,7 @@ public sealed class SeasonService(
         if (crop is null || !crop.IsActive)
             return OperationResult<SeasonDto>.Validation("Crop does not exist or is inactive for this organization.");
 
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = DatabaseTimestamp.UtcNow();
         var season = explicitId is null
             ? Season.Create(organizationId, command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, nowUtc)
             : Season.CreateWithId(explicitId.Value, organizationId, command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, nowUtc);
@@ -128,7 +128,7 @@ public sealed class SeasonService(
         if (crop is null || !crop.IsActive)
             return OperationResult<SeasonDto>.Validation("Crop does not exist or is inactive for this organization.");
 
-        season.Update(command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, command.ActualYieldPerHectare, command.Status, DateTime.UtcNow);
+        season.Update(command.FieldId, command.CropId, command.Name, command.StartDate, command.EndDate, command.ExpectedYieldPerHectare, command.ActualYieldPerHectare, command.Status, DatabaseTimestamp.UtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<SeasonDto>.Success(ToDto(season));
     }
@@ -145,7 +145,7 @@ public sealed class SeasonService(
         if (field is null || !await accessScope.CanAccessFarmAsync(organizationId, userId, field.FarmId, cancellationToken))
             return OperationResult<bool>.NotFound("Season not found.");
 
-        season.Deactivate(DateTime.UtcNow);
+        season.Deactivate(DatabaseTimestamp.UtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return OperationResult<bool>.Success(true);
     }
