@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AgroControl.Application.Production;
 
 namespace AgroControl.Application.Sync;
@@ -37,3 +38,54 @@ public sealed record OfflinePullDto(
     long LastSequence,
     bool HasMore,
     DateTime ServerTimeUtc);
+
+public sealed record OfflinePushRequestDto(
+    Guid FarmId,
+    IReadOnlyList<OfflinePushOperationDto> Operations);
+
+public sealed record OfflinePushOperationDto(
+    Guid OperationId,
+    string EntityKind,
+    Guid EntityId,
+    string Operation,
+    string? BaseServerVersion,
+    JsonElement? Payload);
+
+public sealed record OfflinePushOperationResultDto(
+    Guid OperationId,
+    string EntityKind,
+    Guid EntityId,
+    string Status,
+    string? ServerVersion,
+    object? ServerEntity,
+    string? ErrorCode,
+    string? Message,
+    bool Replayed);
+
+public sealed record OfflinePushDto(
+    Guid FarmId,
+    IReadOnlyList<OfflinePushOperationResultDto> Results,
+    DateTime ServerTimeUtc);
+
+public sealed record OfflineFieldMutationPayload(
+    Guid FarmId,
+    string Name,
+    decimal AreaHectares);
+
+public sealed record OfflineSeasonCreatePayload(
+    Guid FieldId,
+    Guid CropId,
+    string Name,
+    DateOnly StartDate,
+    DateOnly? EndDate,
+    decimal? ExpectedYieldPerHectare);
+
+public sealed record OfflineSeasonUpdatePayload(
+    Guid FieldId,
+    Guid CropId,
+    string Name,
+    DateOnly StartDate,
+    DateOnly? EndDate,
+    decimal? ExpectedYieldPerHectare,
+    decimal? ActualYieldPerHectare,
+    string Status);
