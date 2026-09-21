@@ -1,5 +1,10 @@
 # AgroControl
 
+[![Backend CI](https://github.com/M4rc3low/AgroControl/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/M4rc3low/AgroControl/actions/workflows/backend-ci.yml)
+[![Frontend CI](https://github.com/M4rc3low/AgroControl/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/M4rc3low/AgroControl/actions/workflows/frontend-ci.yml)
+[![Platform CI](https://github.com/M4rc3low/AgroControl/actions/workflows/platform-ci.yml/badge.svg)](https://github.com/M4rc3low/AgroControl/actions/workflows/platform-ci.yml)
+[![CodeQL](https://github.com/M4rc3low/AgroControl/actions/workflows/codeql.yml/badge.svg)](https://github.com/M4rc3low/AgroControl/actions/workflows/codeql.yml)
+
 **AgroControl** é uma plataforma modular de gestão, inteligência e tecnologia para o agronegócio. O núcleo transacional é um **monólito modular em C# / ASP.NET Core**, complementado por **Python / FastAPI** para inteligência e processamento científico, **Java / Spring Boot** para telemetria e uma única aplicação **React + TypeScript + Vite** distribuída em navegador, PWA e Desktop Windows.
 
 > Status: **Sprint 21 concluída — offline real por fazenda + sincronização controlada**  
@@ -329,6 +334,6 @@ O fluxo recomendado é PR + checks verdes + squash merge. A configuração admin
 - [`docs/SPRINT_21_OFFLINE_SYNC.md`](docs/SPRINT_21_OFFLINE_SYNC.md)
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
-## Licença
+## Licenciamento
 
-Consulte o arquivo `LICENSE` do repositório.
+Este repositório não publica uma licença de uso no momento. A ausência de um arquivo `LICENSE` significa que nenhum direito adicional de cópia, modificação ou redistribuição é concedido automaticamente.
