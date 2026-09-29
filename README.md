@@ -1,5 +1,13 @@
 # AgroControl
 
+<!-- portfolio-cover:start -->
+<div align="center">
+  <img src="https://raw.githubusercontent.com/M4rc3low/M4rc3low.github.io/main/assets/projects/agrocontrol.svg" alt="Capa conceitual ilustrativa do projeto AgroControl" width="920">
+</div>
+
+> **Capa visual ilustrativa:** representa o conceito do projeto; não é uma captura da aplicação em execução. Veja a [galeria visual completa](https://m4rc3low.github.io/projetos.html).
+<!-- portfolio-cover:end -->
+
 [![Backend CI](https://github.com/M4rc3low/AgroControl/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/M4rc3low/AgroControl/actions/workflows/backend-ci.yml)
 [![Frontend CI](https://github.com/M4rc3low/AgroControl/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/M4rc3low/AgroControl/actions/workflows/frontend-ci.yml)
 [![Platform CI](https://github.com/M4rc3low/AgroControl/actions/workflows/platform-ci.yml/badge.svg)](https://github.com/M4rc3low/AgroControl/actions/workflows/platform-ci.yml)
