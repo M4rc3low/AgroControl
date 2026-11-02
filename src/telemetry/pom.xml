@@ -14,7 +14,7 @@
   <description>Telemetry and IoT ingestion service for AgroControl</description>
   <properties>
     <java.version>21</java.version>
-    <springdoc.version>3.1.1</springdoc.version>
+    <springdoc.version>3.2.0</springdoc.version>
   </properties>
   <dependencies>
     <dependency>
